@@ -1,0 +1,59 @@
+{
+  "name": "pekko",
+  "version": "0.1.0",
+  "description": "Mechanical keyboard sound simulator for macOS — pixel-art UI, spatial audio, 13 switch profiles",
+  "main": "dist-main/main/index.js",
+  "homepage": "https://github.com/UltiSpike/pekko",
+  "author": "pochita",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UltiSpike/pekko.git"
+  },
+  "bugs": {
+    "url": "https://github.com/UltiSpike/pekko/issues"
+  },
+  "keywords": [
+    "mechanical-keyboard",
+    "keyboard-sounds",
+    "pixel-art",
+    "pekko",
+    "electron",
+    "macos",
+    "audio",
+    "spatial-audio"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "npm run build:main && concurrently -k \"vite\" \"electron .\"",
+    "dev:debug": "npm run build:main && concurrently -k \"vite\" \"DEVTOOLS=1 electron .\"",
+    "dev:renderer": "vite",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build": "npm run build:renderer && npm run build:main",
+    "package": "npm run build && electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "nes.css": "^2.2.1",
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "concurrently": "^8.2.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^26.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0"
+  }
+}
