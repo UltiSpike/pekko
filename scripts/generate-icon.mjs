@@ -9,48 +9,85 @@ const root = join(__dirname, '..');
 const iconsetDir = join(root, 'assets/icons/pekko.iconset');
 
 // ── Bird shape: Phosphor Icons "Bird" (Fill), MIT License ──
-// Original viewBox: 0 0 256 256
-// Source: https://phosphoricons.com
+// Source: https://phosphoricons.com — viewBox 0 0 256 256
 const phosphorBirdPath = 'M236.44,73.34,213.21,57.86A60,60,0,0,0,156,16h-.29C122.79,16.16,96,43.47,96,76.89V96.63L11.63,197.88l-.1.12A16,16,0,0,0,24,224h88A104.11,104.11,0,0,0,216,120V100.28l20.44-13.62a8,8,0,0,0,0-13.32ZM126.15,133.12l-60,72a8,8,0,1,1-12.29-10.24l60-72a8,8,0,1,1,12.29,10.24ZM164,80a12,12,0,1,1,12-12A12,12,0,0,1,164,80Z';
 
 // ── App icon SVG ──
+// Layered lighting: background glow → bird body → top highlight → bottom shadow
 function makeAppIconSvg(size) {
-  // Center the 256x256 bird in a 512x512 canvas with padding
-  // Scale 1.4x and offset to center nicely
-  const birdScale = 1.4;
-  const birdOffsetX = (512 - 256 * birdScale) / 2 + 8; // nudge right slightly
-  const birdOffsetY = (512 - 256 * birdScale) / 2 + 4;
+  const s = 1.4;
+  const ox = (512 - 256 * s) / 2 + 8;
+  const oy = (512 - 256 * s) / 2 + 4;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
-      <stop offset="0%" stop-color="#2c2420"/>
-      <stop offset="100%" stop-color="#181210"/>
-    </linearGradient>
-    <linearGradient id="birdGrad" x1="0.15" y1="0" x2="0.75" y2="1">
-      <stop offset="0%" stop-color="#f2c864"/>
-      <stop offset="50%" stop-color="#daa840"/>
-      <stop offset="100%" stop-color="#c08a30"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.45" r="0.5">
-      <stop offset="0%" stop-color="#f2c864" stop-opacity="0.07"/>
-      <stop offset="100%" stop-color="#f2c864" stop-opacity="0"/>
+    <!-- Background: warm dark gradient with subtle vignette -->
+    <radialGradient id="bgRad" cx="0.5" cy="0.42" r="0.7">
+      <stop offset="0%" stop-color="#342a24"/>
+      <stop offset="100%" stop-color="#140e0a"/>
     </radialGradient>
-    <filter id="shadow" x="-10%" y="-5%" width="120%" height="125%">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.4"/>
+
+    <!-- Bird body: rich amber gradient, top-left lit -->
+    <linearGradient id="birdMain" x1="0.1" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#fad272"/>
+      <stop offset="40%" stop-color="#e8ac3c"/>
+      <stop offset="100%" stop-color="#b8802c"/>
+    </linearGradient>
+
+    <!-- Top-light overlay: simulates light hitting the top of the bird -->
+    <radialGradient id="topLight" cx="0.4" cy="0.2" r="0.55">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Bottom shadow overlay: simulates underside shadow -->
+    <linearGradient id="bottomDark" x1="0" y1="0.4" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Warm ambient glow behind the bird -->
+    <radialGradient id="ambientGlow" cx="0.52" cy="0.46" r="0.38">
+      <stop offset="0%" stop-color="#f0b840" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#f0b840" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Drop shadow -->
+    <filter id="birdShadow" x="-15%" y="-10%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#0a0604" flood-opacity="0.55"/>
     </filter>
+
+    <!-- Clip for overlay layers to bird shape -->
+    <clipPath id="birdClip">
+      <path d="${phosphorBirdPath}" transform="translate(${ox}, ${oy}) scale(${s})"/>
+    </clipPath>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
-  <g filter="url(#shadow)" transform="translate(${birdOffsetX}, ${birdOffsetY}) scale(${birdScale})">
-    <path d="${phosphorBirdPath}" fill="url(#birdGrad)"/>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgRad)"/>
+
+  <!-- Ambient glow behind bird -->
+  <rect width="512" height="512" rx="112" fill="url(#ambientGlow)"/>
+
+  <!-- Bird with shadow -->
+  <g filter="url(#birdShadow)">
+    <path d="${phosphorBirdPath}" fill="url(#birdMain)" transform="translate(${ox}, ${oy}) scale(${s})"/>
   </g>
+
+  <!-- Top highlight (clipped to bird) -->
+  <rect width="512" height="512" fill="url(#topLight)" clip-path="url(#birdClip)"/>
+
+  <!-- Bottom darken (clipped to bird) -->
+  <rect width="512" height="512" fill="url(#bottomDark)" clip-path="url(#birdClip)"/>
+
+  <!-- Subtle edge highlight on top-left — simulates rim light -->
+  <path d="${phosphorBirdPath}" fill="none" stroke="url(#topLight)" stroke-width="1.5"
+        transform="translate(${ox}, ${oy}) scale(${s})" opacity="0.4"/>
 </svg>`;
 }
 
 // ── Tray icon SVG (monochrome template image) ──
 function makeTrayIconSvg(size) {
-  // Fit the 256x256 bird into tray size with padding
   const padding = size * 0.1;
   const avail = size - padding * 2;
   const scale = avail / 256;
@@ -63,7 +100,7 @@ function makeTrayIconSvg(size) {
 </svg>`;
 }
 
-// ── Generate all sizes ──
+// ── Generate ──
 async function main() {
   if (!existsSync(iconsetDir)) mkdirSync(iconsetDir, { recursive: true });
 
@@ -78,15 +115,14 @@ async function main() {
       writeFileSync(join(iconsetDir, name), buf);
       console.log(`  ✓ ${name}`);
     }
-    const halfSize = size / 2;
-    if (halfSize >= 16 && halfSize <= 512) {
-      const name = `icon_${halfSize}x${halfSize}@2x.png`;
+    const half = size / 2;
+    if (half >= 16 && half <= 512) {
+      const name = `icon_${half}x${half}@2x.png`;
       writeFileSync(join(iconsetDir, name), buf);
       console.log(`  ✓ ${name}`);
     }
   }
 
-  // .icns
   try {
     execSync(`iconutil -c icns "${iconsetDir}" -o "${join(root, 'assets/icons/app-icon.icns')}"`);
     console.log(`  ✓ app-icon.icns`);
@@ -94,7 +130,6 @@ async function main() {
     console.log(`  ⚠ iconutil: ${e.message}`);
   }
 
-  // Tray
   for (const [size, name] of [[18, 'tray-icon.png'], [36, 'tray-icon@2x.png']]) {
     const svg = makeTrayIconSvg(size);
     const buf = await sharp(Buffer.from(svg)).png().toBuffer();
