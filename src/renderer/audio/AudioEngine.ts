@@ -1,0 +1,551 @@
+import { getKeyPan } from '@shared/key-positions'
+
+interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
+interface MultiPack {
+  press: { generic: AudioBuffer[]; special: Record<string, AudioBuffer> }
+  release: { generic: AudioBuffer | null; special: Record<string, AudioBuffer> }
+}
+type LoadedPack =
+  | { type: 'sprite'; keys: Map<number, SpriteKeySound>; fallbackDown: AudioBuffer | null; fallbackUp: AudioBuffer | null }
+  | { type: 'multi'; data: MultiPack }
+
+interface VoiceSlot {
+  gain: GainNode; panner: StereoPannerNode; source: AudioBufferSourceNode | null; busy: boolean
+}
+
+const POOL_SIZE = 24
+const FADE_MS = 0.008
+const MAX_DUR = 0.40
+const SCHEDULE_OFFSET = 0.005 // #2: Fixed 5ms scheduling offset for jitter-free playback
+const SPECIAL_KEYS: Record<number, string> = { 14: 'BACKSPACE', 28: 'ENTER', 41: 'ENTER', 57: 'SPACE' }
+
+export class AudioEngine {
+  private ctx: AudioContext | null = null
+  private masterGain: GainNode | null = null
+  private compressor: DynamicsCompressorNode | null = null
+  private packs: Map<string, LoadedPack> = new Map()
+  private activeProfile = ''
+  private lastVariant = -1
+  private pool: VoiceSlot[] = []
+  private activeVoices = 0
+
+  // #3: Typing intensity model
+  private lastKeyTime = 0
+  private typingIntensity = 0.7  // 0.3 (gentle) → 1.0 (forceful)
+  private keyIntensityMap = new Map<number, number>() // keycode → keydown intensity for keyup correlation
+
+  // #4: Ambient noise layer
+  private ambientGain: GainNode | null = null
+  private ambientSource: AudioBufferSourceNode | null = null
+  private ambientFadeTimer: ReturnType<typeof setTimeout> | null = null
+  private ambientActive = false
+
+  // #5: Adaptive volume decay
+  private baseVolume = 1.0         // user-set volume
+  private adaptiveMultiplier = 1.0 // decays during sustained typing
+  private typingStartTime = 0
+  private lastAdaptiveUpdate = 0
+  private adaptiveTimer: ReturnType<typeof setTimeout> | null = null
+
+  // WPM tracking (keydown timestamps from last 5 seconds)
+  private keyTimestamps: number[] = []
+  private _wpm = 0
+  private _typingActive = false
+  private typingTimeout: ReturnType<typeof setTimeout> | null = null
+
+  async init(): Promise<void> {
+    if (this.ctx) return
+    this.ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: 44100 })
+
+    // === Psychoacoustic audio chain ===
+    // dest ← compressor(atk=35ms) ← airLPF(13k) ← highShelf(9k) ← midScoop(3.8k) ← lowShelf(180) ← [dry + deskLPF wet] ← master
+
+    this.compressor = this.ctx.createDynamicsCompressor()
+    this.compressor.threshold.value = -18; this.compressor.knee.value = 12
+    this.compressor.ratio.value = 2.5; this.compressor.attack.value = 0.035; this.compressor.release.value = 0.2
+    this.compressor.connect(this.ctx.destination)
+
+    // High shelf: +0.5dB above 9kHz — subtle air, minimal long-term fatigue
+    const highShelf = this.ctx.createBiquadFilter()
+    highShelf.type = 'highshelf'
+    highShelf.frequency.value = 9000
+    highShelf.gain.value = 0.5
+
+    // Air absorption LPF: 13kHz gentle rolloff — removes digital harshness
+    const airLPF = this.ctx.createBiquadFilter()
+    airLPF.type = 'lowpass'
+    airLPF.frequency.value = 13000
+    airLPF.Q.value = 0.5
+    highShelf.connect(airLPF)
+    airLPF.connect(this.compressor)
+
+    // Mid scoop: -3dB at 3.8kHz Q=1.5 — targets ear canal resonance harshness (3.5-5kHz)
+    const midScoop = this.ctx.createBiquadFilter()
+    midScoop.type = 'peaking'
+    midScoop.frequency.value = 3800
+    midScoop.Q.value = 1.5
+    midScoop.gain.value = -3
+    midScoop.connect(highShelf)
+
+    // Low shelf: +2.5dB below 180Hz — warm thock without mud
+    const lowShelf = this.ctx.createBiquadFilter()
+    lowShelf.type = 'lowshelf'
+    lowShelf.frequency.value = 180
+    lowShelf.gain.value = 2.5
+    lowShelf.connect(midScoop)
+
+    // Dry/wet desk reflection
+    const dryGain = this.ctx.createGain()
+    dryGain.gain.value = 0.88
+    dryGain.connect(lowShelf)
+
+    const delay = this.ctx.createDelay(0.1)
+    delay.delayTime.value = 0.012
+    // Desk surface LPF: wood/plastic absorbs >3.5kHz — warm reflection
+    const deskLPF = this.ctx.createBiquadFilter()
+    deskLPF.type = 'lowpass'
+    deskLPF.frequency.value = 3500
+    deskLPF.Q.value = 0.7
+    const wetGain = this.ctx.createGain()
+    wetGain.gain.value = 0.12
+    delay.connect(deskLPF)
+    deskLPF.connect(wetGain)
+    wetGain.connect(lowShelf)
+
+    this.masterGain = this.ctx.createGain()
+    this.masterGain.connect(dryGain)
+    this.masterGain.connect(delay)
+
+    // === Ambient brown noise (bandpass-shaped for room character) ===
+    this.ambientGain = this.ctx.createGain()
+    this.ambientGain.gain.value = 0  // starts silent
+    const ambientBP = this.ctx.createBiquadFilter()
+    ambientBP.type = 'bandpass'
+    ambientBP.frequency.value = 800
+    ambientBP.Q.value = 0.5
+    this.ambientGain.connect(ambientBP)
+    ambientBP.connect(this.compressor)
+    this.startAmbientNoise()
+
+    this.initPool()
+    this.keepAlive()
+    console.log('[Audio] init: psychoacoustic chain (transient-safe comp + precise EQ + spatial + ambient)')
+  }
+
+  // === #4: Brown noise generator (runs continuously at ~-35dB when typing) ===
+  private startAmbientNoise() {
+    if (!this.ctx || !this.ambientGain) return
+
+    // Generate 2 seconds of brown noise (random walk, low-pass filtered)
+    const sr = this.ctx.sampleRate
+    const len = sr * 2
+    const buf = this.ctx.createBuffer(2, len, sr)
+
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buf.getChannelData(ch)
+      let val = 0
+      for (let i = 0; i < len; i++) {
+        val += (Math.random() * 2 - 1) * 0.02
+        val *= 0.998 // slight decay to prevent drift
+        data[i] = val
+      }
+      // Normalize
+      let max = 0
+      for (let i = 0; i < len; i++) max = Math.max(max, Math.abs(data[i]))
+      if (max > 0) for (let i = 0; i < len; i++) data[i] /= max
+    }
+
+    this.ambientSource = this.ctx.createBufferSource()
+    this.ambientSource.buffer = buf
+    this.ambientSource.loop = true
+    this.ambientSource.connect(this.ambientGain)
+    this.ambientSource.start()
+  }
+
+  private fadeAmbientIn() {
+    if (!this.ctx || !this.ambientGain || this.ambientActive) return
+    this.ambientActive = true
+    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
+
+    const now = this.ctx.currentTime
+    this.ambientGain.gain.cancelScheduledValues(now)
+    this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now)
+    this.ambientGain.gain.linearRampToValueAtTime(0.018, now + 0.5) // -35dB, fade in 500ms
+  }
+
+  private scheduleAmbientFadeOut() {
+    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
+    this.ambientFadeTimer = setTimeout(() => {
+      if (!this.ctx || !this.ambientGain) return
+      this.ambientActive = false
+      const now = this.ctx.currentTime
+      this.ambientGain.gain.cancelScheduledValues(now)
+      this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now)
+      this.ambientGain.gain.linearRampToValueAtTime(0, now + 1.5) // fade out 1.5s
+    }, 2000) // 2 seconds after last keypress
+  }
+
+  // === #3: Typing intensity model ===
+  private updateIntensity() {
+    const now = performance.now()
+    const interval = now - this.lastKeyTime
+    this.lastKeyTime = now
+
+    if (interval > 2000) {
+      // Fresh start — neutral-warm, not a hammer blow
+      this.typingIntensity = 0.80
+    } else if (interval < 80) {
+      // Very fast typing — light touch
+      this.typingIntensity = Math.max(0.35, this.typingIntensity - 0.08)
+    } else if (interval < 150) {
+      // Normal fast typing
+      this.typingIntensity = 0.5 + (interval - 80) / 140 * 0.3 // 0.5-0.8
+    } else {
+      // Slow/deliberate — heavier
+      this.typingIntensity = Math.min(1.0, 0.7 + (interval - 150) / 500 * 0.3)
+    }
+  }
+
+  // === #5: Adaptive volume — decays during sustained typing ===
+  private updateAdaptiveVolume() {
+    const now = performance.now()
+
+    if (now - this.lastKeyTime > 3000) {
+      // Pause > 3 seconds — reset to full volume
+      this.adaptiveMultiplier = 1.0
+      this.typingStartTime = now
+    } else if (this.typingStartTime === 0) {
+      this.typingStartTime = now
+    } else {
+      const typingDuration = (now - this.typingStartTime) / 1000 // seconds
+
+      if (typingDuration < 5) {
+        // First 5 seconds: full volume (novelty phase)
+        this.adaptiveMultiplier = 1.0
+      } else if (typingDuration < 30) {
+        // 5-30 seconds: gentle decay to 0.75
+        this.adaptiveMultiplier = 1.0 - (typingDuration - 5) / 25 * 0.25
+      } else {
+        // 30+ seconds: stable at 0.65 (flow state)
+        this.adaptiveMultiplier = Math.max(0.65, this.adaptiveMultiplier)
+      }
+    }
+
+    this.lastAdaptiveUpdate = now
+  }
+
+  // === Voice pool ===
+  private initPool() {
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const gain = this.ctx!.createGain()
+      const panner = new StereoPannerNode(this.ctx!, { pan: 0 })
+      panner.connect(this.masterGain!); gain.connect(panner)
+      this.pool.push({ gain, panner, source: null, busy: false })
+    }
+  }
+
+  private acquireSlot(): VoiceSlot {
+    for (const s of this.pool) if (!s.busy) { s.busy = true; this.activeVoices++; return s }
+    const v = this.pool[0]; this.stealSlot(v); v.busy = true; return v
+  }
+
+  private stealSlot(slot: VoiceSlot) {
+    if (slot.source && this.ctx) {
+      try {
+        const now = this.ctx.currentTime
+        slot.gain.gain.setValueAtTime(slot.gain.gain.value, now)
+        slot.gain.gain.linearRampToValueAtTime(0, now + FADE_MS)
+        slot.source.stop(now + FADE_MS)
+      } catch {}
+      slot.source = null
+    }
+  }
+
+  private releaseSlot(slot: VoiceSlot) {
+    if (slot.source) { try { slot.source.disconnect() } catch {} slot.source = null }
+    slot.busy = false; this.activeVoices = Math.max(0, this.activeVoices - 1)
+  }
+
+  private keepAlive() {
+    const buf = this.ctx!.createBuffer(1, 1, 44100)
+    const tick = () => { if (!this.ctx) return; const s = this.ctx.createBufferSource(); s.buffer = buf; s.connect(this.ctx.destination); s.start(); setTimeout(tick, 15000) }
+    tick()
+  }
+
+  // === Decode / slice ===
+  private async decodeData(data: Uint8Array | Record<string, number>): Promise<AudioBuffer | null> {
+    try {
+      let ab: ArrayBuffer
+      if (data instanceof Uint8Array) ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      else { const v = Object.keys(data).sort((a, b) => +a - +b).map(k => (data as any)[k]); ab = new Uint8Array(v).buffer }
+      return await this.ctx!.decodeAudioData(ab)
+    } catch { return null }
+  }
+
+  private sliceBuffer(source: AudioBuffer, offsetMs: number, durationMs: number): AudioBuffer {
+    const sr = source.sampleRate
+    const start = Math.floor((offsetMs / 1000) * sr)
+    const len = Math.floor((durationMs / 1000) * sr)
+    const end = Math.min(start + len, source.length)
+    const sliced = new AudioBuffer({ numberOfChannels: source.numberOfChannels, length: end - start, sampleRate: sr })
+    for (let ch = 0; ch < source.numberOfChannels; ch++) sliced.copyToChannel(source.getChannelData(ch).subarray(start, end), ch)
+    return sliced
+  }
+
+  private trimSilence(buf: AudioBuffer): AudioBuffer {
+    const d = buf.getChannelData(0); const thr = 0.003; const lim = Math.min(2048, d.length)
+    let s = 0; for (let i = 0; i < lim; i++) { if (Math.abs(d[i]) > thr) { s = Math.max(0, i - 10); break } }
+    if (s === 0) return buf
+    const n = buf.length - s
+    const t = new AudioBuffer({ numberOfChannels: buf.numberOfChannels, length: n, sampleRate: buf.sampleRate })
+    for (let ch = 0; ch < buf.numberOfChannels; ch++) t.copyToChannel(buf.getChannelData(ch).subarray(s), ch)
+    return t
+  }
+
+  // === Profile loading ===
+  async loadProfile(profileId: string): Promise<void> {
+    if (!this.ctx) await this.init()
+    if (this.packs.has(profileId)) { this.activeProfile = profileId; return }
+
+    const raw = await window.api.loadSoundPack(profileId)
+    if (!raw) return
+
+    const type = raw.config.key_define_type
+    if (type === 'single' && raw.spriteData) await this.loadSpritePack(profileId, raw.config, raw.spriteData)
+    else if (type === 'multi' && raw.files) await this.loadMultiFilePack(profileId, raw.config, raw.files)
+    else if (type === 'kbsim' && raw.files) await this.loadKbsimPack(profileId, raw.files)
+
+    this.activeProfile = profileId
+  }
+
+  private async loadSpritePack(id: string, config: any, spriteData: any) {
+    const fullBuffer = await this.decodeData(spriteData)
+    if (!fullBuffer) return
+
+    const keys = new Map<number, SpriteKeySound>()
+    const entries = Object.entries(config.defines as Record<string, [number, number]>)
+    let fallbackDown: AudioBuffer | null = null, fallbackUp: AudioBuffer | null = null
+
+    // Fallback from key 30 (A)
+    for (const [key, [o, d]] of entries) {
+      const kc = parseInt(key.replace('-up', ''))
+      if (kc !== 30) continue
+      const s = this.sliceBuffer(fullBuffer, o, d)
+      if (key.endsWith('-up')) fallbackUp = s; else fallbackDown = s
+    }
+
+    const pack: LoadedPack = { type: 'sprite', keys, fallbackDown, fallbackUp }
+    this.packs.set(id, pack)
+
+    // Batch slice
+    const BATCH = 30
+    for (let i = 0; i < entries.length; i += BATCH) {
+      for (const [key, [o, d]] of entries.slice(i, i + BATCH)) {
+        const s = this.sliceBuffer(fullBuffer, o, d)
+        const isUp = key.endsWith('-up')
+        const kc = parseInt(isUp ? key.replace('-up', '') : key)
+        if (!keys.has(kc)) keys.set(kc, {})
+        if (isUp) keys.get(kc)!.up = s; else keys.get(kc)!.down = s
+      }
+      if (i + BATCH < entries.length) await new Promise(r => setTimeout(r, 0))
+    }
+
+    if (!fallbackDown) for (const [, v] of keys) { if (v.down) { fallbackDown = v.down; break } }
+    if (!fallbackUp) for (const [, v] of keys) { if (v.up) { fallbackUp = v.up; break } }
+    pack.fallbackDown = fallbackDown; pack.fallbackUp = fallbackUp
+    console.log(`[Audio] ${id}: sprite ${keys.size} keys`)
+  }
+
+  private async loadMultiFilePack(id: string, config: any, files: Record<string, any>) {
+    const keys = new Map<number, SpriteKeySound>()
+    for (const [k, fn] of Object.entries(config.defines || {})) {
+      const isUp = k.endsWith('-up')
+      const kc = parseInt(isUp ? k.replace('-up', '') : k)
+      const buf = files[fn as string] ? await this.decodeData(files[fn as string]) : null
+      if (!buf) continue
+      if (!keys.has(kc)) keys.set(kc, {})
+      if (isUp) keys.get(kc)!.up = buf; else keys.get(kc)!.down = buf
+    }
+    let fd: AudioBuffer | null = null, fu: AudioBuffer | null = null
+    for (const [, v] of keys) { if (v.down && !fd) fd = v.down; if (v.up && !fu) fu = v.up }
+    this.packs.set(id, { type: 'sprite', keys, fallbackDown: fd, fallbackUp: fu })
+    console.log(`[Audio] ${id}: multi ${keys.size} keys`)
+  }
+
+  private async loadKbsimPack(id: string, files: Record<string, any>) {
+    const pack: MultiPack = { press: { generic: [], special: {} }, release: { generic: null, special: {} } }
+    await Promise.all(Object.entries(files).map(async ([name, data]) => {
+      const buf = await this.decodeData(data as any)
+      if (!buf) return
+      const trimmed = this.trimSilence(buf)
+      if (name.startsWith('press/GENERIC_R')) pack.press.generic.push(trimmed)
+      else if (name.startsWith('press/')) pack.press.special[name.replace('press/', '').replace(/\.\w+$/, '')] = trimmed
+      else if (name.startsWith('release/GENERIC')) pack.release.generic = trimmed
+      else if (name.startsWith('release/')) pack.release.special[name.replace('release/', '').replace(/\.\w+$/, '')] = trimmed
+    }))
+    this.packs.set(id, { type: 'multi', data: pack })
+    console.log(`[Audio] ${id}: kbsim ${pack.press.generic.length} variants`)
+  }
+
+  // === Playback (all optimizations converge here) ===
+  playSound(keycode: number, type: 'down' | 'up'): void {
+    if (!this._enabled || !this.ctx || !this.masterGain) return
+    const pack = this.packs.get(this.activeProfile)
+    if (!pack) return
+
+    // WPM tracking (keydown only)
+    if (type === 'down') this.updateWpm()
+
+    // #3: Update typing intensity from inter-key interval
+    this.updateIntensity()
+    // #5: Update adaptive volume
+    this.updateAdaptiveVolume()
+    // #4: Ambient noise management
+    this.fadeAmbientIn()
+    this.scheduleAmbientFadeOut()
+
+    let buffer: AudioBuffer | null | undefined
+
+    if (pack.type === 'sprite') {
+      const keySound = pack.keys.get(keycode)
+      if (type === 'down') buffer = keySound?.down ?? pack.fallbackDown
+      else buffer = keySound?.up ?? pack.fallbackUp
+    } else {
+      const special = SPECIAL_KEYS[keycode]
+      if (type === 'down') buffer = (special && pack.data.press.special[special]) || this.pickVariant(pack.data.press.generic)
+      else buffer = (special && pack.data.release.special[special]) || pack.data.release.generic
+    }
+    if (!buffer) return
+
+    const now = this.ctx.currentTime
+
+    // #2: Fixed scheduling offset — eliminates jitter
+    const playTime = now + SCHEDULE_OFFSET
+
+    const slot = this.acquireSlot()
+    const source = this.ctx.createBufferSource()
+    source.buffer = buffer
+
+    // Keydown-keyup force correlation
+    let volIntensity = this.typingIntensity
+    if (type === 'down') {
+      this.keyIntensityMap.set(keycode, this.typingIntensity)
+    } else {
+      // Heavy keydown → controlled release (quieter), light → loose bounce (louder)
+      const downIntensity = this.keyIntensityMap.get(keycode) ?? 0.7
+      this.keyIntensityMap.delete(keycode)
+      volIntensity = 1.15 - downIntensity * 0.3
+    }
+
+    // Pitch: intensity-driven + per-key character + jitter
+    const pitchBase = 1.0 + (1.0 - this.typingIntensity) * 0.03 - this.typingIntensity * 0.02
+    // Per-key character: Knuth hash → deterministic ±1% offset (simulates per-key physical variation)
+    const keyChar = ((keycode * 2654435761 >>> 0) % 200 - 100) / 10000
+    source.playbackRate.value = pitchBase + keyChar + (Math.random() - 0.5) * 0.05 // ±2.5% jitter
+
+    // Volume: intensity × adaptive × ducking × jitter
+    const duckFactor = this.activeVoices > 8 ? 0.8 / Math.sqrt(this.activeVoices - 7) : 1.0
+    const intensityVol = 0.5 + volIntensity * 0.5
+    const microRandom = 0.85 + Math.random() * 0.3 // ±15% (crosses 1dB perception threshold)
+    const finalVol = intensityVol * this.adaptiveMultiplier * duckFactor * microRandom
+
+    slot.gain.gain.setValueAtTime(finalVol, playTime)
+    slot.panner.pan.setValueAtTime(getKeyPan(keycode), playTime)
+
+    source.connect(slot.gain)
+    slot.source = source
+
+    // Sample offset jitter: 0-2ms varies transient micro-shape
+    const offsetJitter = Math.random() * 0.002
+    const dur = Math.min(buffer.duration - offsetJitter, MAX_DUR)
+    const fadeStart = Math.max(0, dur - 0.025)
+    slot.gain.gain.setValueAtTime(finalVol, playTime + fadeStart)
+    slot.gain.gain.linearRampToValueAtTime(0, playTime + dur)
+    source.start(playTime, offsetJitter)
+    source.stop(playTime + dur)
+    source.onended = () => this.releaseSlot(slot)
+  }
+
+  private pickVariant(variants: AudioBuffer[]): AudioBuffer | undefined {
+    if (!variants.length) return undefined
+    let i: number; do { i = Math.floor(Math.random() * variants.length) } while (i === this.lastVariant && variants.length > 1)
+    this.lastVariant = i; return variants[i]
+  }
+
+  setVolume(v: number) {
+    this.baseVolume = Math.max(0, Math.min(1, v))
+    if (this.masterGain) this.masterGain.gain.value = this.baseVolume
+  }
+
+  // --- WPM tracking ---
+  private updateWpm() {
+    const now = performance.now()
+    this.keyTimestamps.push(now)
+    // Keep only last 5 seconds
+    const cutoff = now - 5000
+    this.keyTimestamps = this.keyTimestamps.filter(t => t > cutoff)
+    // WPM = (keys in 5s / 5) × 60 / 5 (avg word = 5 chars)
+    this._wpm = Math.round((this.keyTimestamps.length / 5) * 12)
+    this._typingActive = true
+    // Reset typing active after 2s idle
+    if (this.typingTimeout) clearTimeout(this.typingTimeout)
+    this.typingTimeout = setTimeout(() => { this._typingActive = false; this._wpm = 0 }, 2000)
+  }
+
+  get wpm() { return this._wpm }
+  get typingActive() { return this._typingActive }
+
+  // --- Sound toggle (Cmd+Shift+K) ---
+  private _enabled = true
+  get enabled() { return this._enabled }
+  setEnabled(v: boolean) { this._enabled = v }
+
+  resume() { if (this.ctx?.state === 'suspended') this.ctx.resume() }
+
+  // --- Cleanup (prevents memory leaks) ---
+  destroy() {
+    // Stop all active sources
+    for (const slot of this.pool) {
+      if (slot.source) {
+        try { slot.source.stop(); slot.source.disconnect() } catch {}
+        slot.source = null
+      }
+      slot.busy = false
+    }
+    this.activeVoices = 0
+
+    // Stop ambient
+    if (this.ambientSource) {
+      try { this.ambientSource.stop(); this.ambientSource.disconnect() } catch {}
+      this.ambientSource = null
+    }
+    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
+    if (this.adaptiveTimer) clearTimeout(this.adaptiveTimer)
+    if (this.typingTimeout) clearTimeout(this.typingTimeout)
+
+    // Close AudioContext
+    if (this.ctx) {
+      this.ctx.close()
+      this.ctx = null
+    }
+
+    this.masterGain = null
+    this.compressor = null
+    this.ambientGain = null
+    this.pool = []
+    this.packs.clear()
+    this.keyIntensityMap.clear()
+    console.log('[Audio] destroyed')
+  }
+
+  // --- Bluetooth latency detection ---
+  checkOutputLatency(): { latencyMs: number; isBluetooth: boolean } {
+    if (!this.ctx) return { latencyMs: 0, isBluetooth: false }
+    const latencyMs = (this.ctx.outputLatency ?? this.ctx.baseLatency) * 1000
+    // Bluetooth typically adds 40-200ms; wired/speakers are <15ms
+    const isBluetooth = latencyMs > 30
+    return { latencyMs: Math.round(latencyMs), isBluetooth }
+  }
+}
+
+export const audioEngine = new AudioEngine()

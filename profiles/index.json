@@ -1,0 +1,17 @@
+{
+  "profiles": [
+    { "id": "cherrymx-black-abs",         "name": "Cherry MX Black (HQ)",    "description": "Linear, per-key recording, with keyup",   "type": "linear"  },
+    { "id": "cherrymx-blue-abs",          "name": "Cherry MX Blue (HQ)",     "description": "Clicky, per-key recording, 114 keys",     "type": "clicky"  },
+    { "id": "cherrymx-brown-abs",         "name": "Cherry MX Brown (HQ)",    "description": "Tactile, per-key recording",              "type": "tactile" },
+    { "id": "cherrymx-red-abs",           "name": "Cherry MX Red (HQ)",      "description": "Linear, per-key recording",               "type": "linear"  },
+    { "id": "topre-purple-hybrid-pbt",    "name": "Topre Purple (HQ)",       "description": "Electro-capacitive, per-key recording",   "type": "tactile" },
+    { "id": "nk-cream",                   "name": "NK Cream (HQ WAV)",       "description": "Linear, individual WAV per key",          "type": "linear"  },
+    { "id": "holypanda",  "name": "Holy Panda",         "description": "Tactile bump, 5 variants",              "type": "tactile" },
+    { "id": "redink",     "name": "Gateron Red Ink",    "description": "Linear, 5 variants",                    "type": "linear"  },
+    { "id": "blackink",   "name": "Gateron Black Ink",  "description": "Linear, heavy, 5 variants",             "type": "linear"  },
+    { "id": "boxnavy",    "name": "Kailh Box Navy",     "description": "Thick click bar, 5 variants",           "type": "clicky"  },
+    { "id": "mxblue",     "name": "Cherry MX Blue",     "description": "Classic clicky, 5 variants",            "type": "clicky"  },
+    { "id": "topre",      "name": "Topre",              "description": "Rubber dome thock, 5 variants",         "type": "tactile" },
+    { "id": "buckling",   "name": "Buckling Spring",    "description": "IBM Model M, 5 variants",              "type": "clicky"  }
+  ]
+}

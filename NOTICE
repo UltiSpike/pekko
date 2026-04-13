@@ -1,0 +1,19 @@
+Pekko
+Copyright 2024-2026 pochita
+
+This product includes software developed by pochita.
+
+Third-party dependencies:
+
+  - uiohook-napi (MIT License) - https://github.com/nickolay/uiohook-napi
+  - nes.css (MIT License) - https://github.com/nostalgic-css/NES.css
+  - Electron (MIT License) - https://github.com/electron/electron
+  - React (MIT License) - https://github.com/facebook/react
+
+Sound packs in assets/sounds-hq/ are sourced from the Mechvibes community
+(https://mechvibes.com). These sound packs are NOT covered by this project's
+Apache 2.0 license. Please refer to the original authors for licensing terms.
+
+Sound packs in assets/sounds/ may originate from Freesound.org (CC0),
+community contributions, or personal recordings. Check individual pack
+metadata for specific licensing.
