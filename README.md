@@ -54,9 +54,7 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 ## Acoustic engine
 
-Every keypress passes through a psychoacoustic chain of EQ, desk reflection, and stereo panning. What changes per mode: low-shelf weight, wet mix, air LPF ceiling, per-key jitter. What stays constant: 24-voice pool, 104-key stereo pan map, sub-10 ms end-to-end latency.
-
-The ambient bed is generated live (brown or pink noise, no audio assets) and **bypasses the keystroke compressor**, so it never ducks your typing transients. Sample-accurate scheduling offset of 2 ms keeps timing jitter-free without adding perceptible delay.
+Per-mode morph: low-shelf weight, wet mix, air LPF, per-key jitter. Constant across modes: 24-voice pool, 104-key stereo pan map, sub-10 ms end-to-end latency.
 
 <details>
 <summary>Signal chain & parameters</summary>
@@ -97,8 +95,6 @@ Cherry MX Black · Blue · Brown · Red · NK Cream · Topre Purple · Holy Pand
 
 Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 
-The switch picks the **material** of every keystroke. The mode picks **how you experience it**. Switches are orthogonal to modes — the same Holy Panda recording sounds like a different keyboard under Thock vs Deep Focus.
-
 &nbsp;
 
 ---
@@ -106,8 +102,6 @@ The switch picks the **material** of every keystroke. The mode picks **how you e
 &nbsp;
 
 ## Open it up
-
-Every layer of Pekko is accessible.
 
 **Modes** — Each preset is a `Mode` object: `bed`, `bedGainDb`, and a `ModeStyle` bundle (jitter, EQ shape, wet mix). Add or tweak in [`src/shared/modes.ts`](src/shared/modes.ts).
 
