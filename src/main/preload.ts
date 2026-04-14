@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('api', {
   setTheme:        (t: string)  => ipcRenderer.invoke('set-theme', t),
   setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
   setCustomConfig: (cfg: any)   => ipcRenderer.invoke('set-custom-config', cfg),
+  setSwitchDspOverride: (profileId: string, override: any) =>
+    ipcRenderer.invoke('set-switch-dsp-override', { profileId, override }),
   getSettings:       ()            => ipcRenderer.invoke('get-settings'),
   getProfiles:       ()            => ipcRenderer.invoke('get-profiles'),
   loadSoundPack:     (id: string)  => ipcRenderer.invoke('load-sound-pack', id),

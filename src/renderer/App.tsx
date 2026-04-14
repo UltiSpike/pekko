@@ -11,9 +11,12 @@ import {
   DEFAULT_CUSTOM_STYLE,
   DEFAULT_CUSTOM_BED,
   DEFAULT_CUSTOM_BED_GAIN_DB,
+  DEFAULT_SWITCH_DSP,
   buildCustomMode,
+  resolveSwitchDsp,
   BedType,
   ModeStyle,
+  SwitchDspOverride,
 } from '@shared/modes'
 import './App.css'
 
@@ -44,6 +47,9 @@ export default function App() {
   const [customBedGainDb, setCustomBedGainDb] = useState<number>(DEFAULT_CUSTOM_BED_GAIN_DB)
   const [customStyle, setCustomStyle] = useState<ModeStyle>({ ...DEFAULT_CUSTOM_STYLE })
 
+  // Per-switch DSP overrides keyed by profileId. Sparse: only fields the user touched.
+  const [switchDspOverrides, setSwitchDspOverrides] = useState<Record<string, SwitchDspOverride>>({})
+
   const [isTuning, setIsTuning] = useState(false)
 
   // Resolved active Mode (object) — memoized so the engine effect doesn't re-run on every render
@@ -52,7 +58,16 @@ export default function App() {
     return MODES.find(m => m.id === mode) ?? MODES[0]
   }, [mode, customStyle, customBed, customBedGainDb])
 
-  const { bluetoothWarning, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode)
+  const activeProfileObj = profiles.find(p => p.id === activeProfile)
+  const presetDsp = activeProfileObj?.dsp ?? DEFAULT_SWITCH_DSP
+  const overrideForActive = switchDspOverrides[activeProfile]
+  // Memoized so the engine effect only fires when the resolved DSP actually changes.
+  const effectiveDsp = useMemo(
+    () => resolveSwitchDsp(activeProfileObj?.dsp, overrideForActive),
+    [activeProfileObj, overrideForActive]
+  )
+
+  const { bluetoothWarning, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode, effectiveDsp)
 
   // Load persisted settings
   useEffect(() => {
@@ -65,6 +80,7 @@ export default function App() {
       if (s.customBed) setCustomBed(s.customBed)
       if (typeof s.customBedGainDb === 'number') setCustomBedGainDb(s.customBedGainDb)
       if (s.customStyle) setCustomStyle(s.customStyle)
+      if (s.switchDspOverrides) setSwitchDspOverrides(s.switchDspOverrides)
     }).catch(console.error)
   }, [])
 
@@ -140,6 +156,21 @@ export default function App() {
     persistCustom(bed, gain, style)
   }, [persistCustom])
 
+  // Per-switch DSP override handlers. Override is sparse — only includes fields the user has changed.
+  const handleSwitchDspChange = useCallback((override: SwitchDspOverride) => {
+    setSwitchDspOverrides((prev) => ({ ...prev, [activeProfile]: override }))
+    if (hasApi) window.api.setSwitchDspOverride(activeProfile, override)
+  }, [activeProfile])
+
+  const resetSwitchDsp = useCallback(() => {
+    setSwitchDspOverrides((prev) => {
+      const next = { ...prev }
+      delete next[activeProfile]
+      return next
+    })
+    if (hasApi) window.api.setSwitchDspOverride(activeProfile, {})
+  }, [activeProfile])
+
   const activeData = profiles.find(p => p.id === activeProfile)
   const activeIndex = profiles.findIndex(p => p.id === activeProfile)
   const isHQ = activeProfile.startsWith('cherrymx-') || activeProfile.startsWith('topre-purple') || activeProfile === 'nk-cream'
@@ -179,13 +210,21 @@ export default function App() {
     return (
       <div className="app">
         <TuneView
+          profileName={activeData?.name ?? activeProfile}
+          presetDsp={presetDsp}
+          effectiveDsp={effectiveDsp}
+          dspOverride={overrideForActive ?? {}}
+          onSwitchDspChange={handleSwitchDspChange}
+          onResetSwitchDsp={resetSwitchDsp}
+          modeName={activeMode.name}
+          isCustomMode={mode === 'custom'}
           bed={customBed}
           bedGainDb={customBedGainDb}
           style={customStyle}
           onBedChange={handleCustomBedChange}
           onBedGainChange={handleCustomBedGainChange}
           onStyleChange={handleCustomStyleChange}
-          onReset={resetCustom}
+          onResetMode={resetCustom}
           onClose={() => setIsTuning(false)}
         />
       </div>
@@ -226,9 +265,6 @@ export default function App() {
           <button className="nav-btn" onClick={() => cycleMode(1)} aria-label="Next mode">{'\u203a'}</button>
         </div>
         <div className="mode-description" aria-live="polite">{activeMode.description}</div>
-        {mode === 'custom' && (
-          <button className="mode-tune-btn" onClick={() => setIsTuning(true)}>Tune</button>
-        )}
       </div>
 
       {/* Current profile */}
@@ -247,6 +283,10 @@ export default function App() {
                 {activeData.type.toUpperCase()}
               </span>
               {isHQ && <span className="hq-badge">HQ</span>}
+              <button className="tune-chip" onClick={() => setIsTuning(true)} aria-label="Tune switch sound">
+                <span className="tune-chip-icon" aria-hidden="true">{'\u2261'}</span>
+                TUNE
+              </button>
             </div>
             <div className="profile-current-desc">{activeData.description}</div>
             <div className="profile-counter">{activeIndex + 1} / {profiles.length}</div>

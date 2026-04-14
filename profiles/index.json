@@ -1,17 +1,95 @@
 {
   "profiles": [
-    { "id": "cherrymx-black-abs",         "name": "Cherry MX Black (HQ)",    "description": "Smooth linear, stable bottom-out",        "type": "linear"  },
-    { "id": "cherrymx-blue-abs",          "name": "Cherry MX Blue (HQ)",     "description": "Sharp click, bright and crisp",           "type": "clicky"  },
-    { "id": "cherrymx-brown-abs",         "name": "Cherry MX Brown (HQ)",    "description": "Soft tactile bump, neutral tone",         "type": "tactile" },
-    { "id": "cherrymx-red-abs",           "name": "Cherry MX Red (HQ)",      "description": "Light linear, quick and airy",            "type": "linear"  },
-    { "id": "topre-purple-hybrid-pbt",    "name": "Topre Purple (HQ)",       "description": "Electro-capacitive thock, hybrid PBT",    "type": "tactile" },
-    { "id": "nk-cream",                   "name": "NK Cream (HQ WAV)",       "description": "Dry linear, clean and minimal",           "type": "linear"  },
-    { "id": "holypanda",  "name": "Holy Panda",         "description": "Pronounced tactile bump, snappy return",  "type": "tactile" },
-    { "id": "redink",     "name": "Gateron Red Ink",    "description": "Smooth linear, soft and consistent",      "type": "linear"  },
-    { "id": "blackink",   "name": "Gateron Black Ink",  "description": "Heavy linear, deep and weighty",          "type": "linear"  },
-    { "id": "boxnavy",    "name": "Kailh Box Navy",     "description": "Thick click bar, aggressive and loud",    "type": "clicky"  },
-    { "id": "mxblue",     "name": "Cherry MX Blue",     "description": "Classic click jacket, bright and toothy", "type": "clicky"  },
-    { "id": "topre",      "name": "Topre",              "description": "Rubber-dome thock, soft and springy",     "type": "tactile" },
-    { "id": "buckling",   "name": "Buckling Spring",    "description": "IBM Model M, percussive and unmistakable","type": "clicky"  }
+    {
+      "id": "cherrymx-black-abs",
+      "name": "Cherry MX Black (HQ)",
+      "description": "Smooth linear, stable bottom-out",
+      "type": "linear",
+      "dsp": { "bodyPeakHz": 350, "bodyPeakQ": 1.4, "bodyPeakDb": 2.5, "springNotchDb": -3, "transientDb": 0,    "topDownBalanceDb": -2, "decayScale": 1.0  }
+    },
+    {
+      "id": "cherrymx-blue-abs",
+      "name": "Cherry MX Blue (HQ)",
+      "description": "Sharp click, bright and crisp",
+      "type": "clicky",
+      "dsp": { "bodyPeakHz": 600, "bodyPeakQ": 1.3, "bodyPeakDb": 2,   "springNotchDb": -1, "transientDb": 3,    "topDownBalanceDb": 1,  "decayScale": 0.85 }
+    },
+    {
+      "id": "cherrymx-brown-abs",
+      "name": "Cherry MX Brown (HQ)",
+      "description": "Soft tactile bump, neutral tone",
+      "type": "tactile",
+      "dsp": { "bodyPeakHz": 520, "bodyPeakQ": 1.3, "bodyPeakDb": 2,   "springNotchDb": -2, "transientDb": 1,    "topDownBalanceDb": -1, "decayScale": 0.95 }
+    },
+    {
+      "id": "cherrymx-red-abs",
+      "name": "Cherry MX Red (HQ)",
+      "description": "Light linear, quick and airy",
+      "type": "linear",
+      "dsp": { "bodyPeakHz": 480, "bodyPeakQ": 1.2, "bodyPeakDb": 2,   "springNotchDb": -2, "transientDb": 1,    "topDownBalanceDb": -1, "decayScale": 0.9  }
+    },
+    {
+      "id": "topre-purple-hybrid-pbt",
+      "name": "Topre Purple (HQ)",
+      "description": "Electro-capacitive thock, hybrid PBT",
+      "type": "tactile",
+      "dsp": { "bodyPeakHz": 210, "bodyPeakQ": 1.6, "bodyPeakDb": 5,   "springNotchDb": 0,  "transientDb": 0,    "topDownBalanceDb": -3, "decayScale": 1.2  }
+    },
+    {
+      "id": "nk-cream",
+      "name": "NK Cream (HQ WAV)",
+      "description": "Dry linear, clean and minimal",
+      "type": "linear",
+      "dsp": { "bodyPeakHz": 280, "bodyPeakQ": 1.6, "bodyPeakDb": 4,   "springNotchDb": -4, "transientDb": -1,   "topDownBalanceDb": -3, "decayScale": 1.1  }
+    },
+    {
+      "id": "holypanda",
+      "name": "Holy Panda",
+      "description": "Pronounced tactile bump, snappy return",
+      "type": "tactile",
+      "dsp": { "bodyPeakHz": 320, "bodyPeakQ": 1.4, "bodyPeakDb": 4,   "springNotchDb": -3, "transientDb": 2,    "topDownBalanceDb": 0,  "decayScale": 1.05 }
+    },
+    {
+      "id": "redink",
+      "name": "Gateron Red Ink",
+      "description": "Smooth linear, soft and consistent",
+      "type": "linear",
+      "dsp": { "bodyPeakHz": 380, "bodyPeakQ": 1.4, "bodyPeakDb": 3,   "springNotchDb": -6, "transientDb": 0,    "topDownBalanceDb": -2, "decayScale": 1.0  }
+    },
+    {
+      "id": "blackink",
+      "name": "Gateron Black Ink",
+      "description": "Heavy linear, deep and weighty",
+      "type": "linear",
+      "dsp": { "bodyPeakHz": 240, "bodyPeakQ": 1.7, "bodyPeakDb": 4.5, "springNotchDb": -5, "transientDb": -1.5, "topDownBalanceDb": -2, "decayScale": 1.2  }
+    },
+    {
+      "id": "boxnavy",
+      "name": "Kailh Box Navy",
+      "description": "Thick click bar, aggressive and loud",
+      "type": "clicky",
+      "dsp": { "bodyPeakHz": 420, "bodyPeakQ": 1.5, "bodyPeakDb": 3.5, "springNotchDb": -2, "transientDb": 4,    "topDownBalanceDb": 0,  "decayScale": 0.9  }
+    },
+    {
+      "id": "mxblue",
+      "name": "Cherry MX Blue",
+      "description": "Classic click jacket, bright and toothy",
+      "type": "clicky",
+      "dsp": { "bodyPeakHz": 580, "bodyPeakQ": 1.3, "bodyPeakDb": 2,   "springNotchDb": -1, "transientDb": 3,    "topDownBalanceDb": 1,  "decayScale": 0.85 }
+    },
+    {
+      "id": "topre",
+      "name": "Topre",
+      "description": "Rubber-dome thock, soft and springy",
+      "type": "tactile",
+      "dsp": { "bodyPeakHz": 240, "bodyPeakQ": 1.5, "bodyPeakDb": 4,   "springNotchDb": 0,  "transientDb": -0.5, "topDownBalanceDb": -3, "decayScale": 1.15 }
+    },
+    {
+      "id": "buckling",
+      "name": "Buckling Spring",
+      "description": "IBM Model M, percussive and unmistakable",
+      "type": "clicky",
+      "dsp": { "bodyPeakHz": 350, "bodyPeakQ": 1.5, "bodyPeakDb": 3,   "springNotchDb": 2,  "transientDb": 5,    "topDownBalanceDb": 2,  "decayScale": 1.0  }
+    }
   ]
 }

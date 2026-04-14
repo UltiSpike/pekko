@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { getSettings, setProfile, setVolume, setTheme, setMode, setCustomConfig } from './store'
-import type { BedType, ModeStyle } from '../shared/modes'
+import { getSettings, setProfile, setVolume, setTheme, setMode, setCustomConfig, setSwitchDspOverride } from './store'
+import type { BedType, ModeStyle, SwitchDspOverride } from '../shared/modes'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
 import { rebuildTrayMenu } from './tray'
 
@@ -136,6 +136,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('set-mode', (_event, m: string) => { setMode(m); return true })
   ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle }) => {
     setCustomConfig(cfg)
+    return true
+  })
+  ipcMain.handle('set-switch-dsp-override', (_event, payload: { profileId: string; override: SwitchDspOverride }) => {
+    setSwitchDspOverride(payload.profileId, payload.override)
     return true
   })
   ipcMain.handle('check-permissions', () => checkAccessibilityPermission())

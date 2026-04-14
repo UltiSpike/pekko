@@ -9,6 +9,7 @@ import {
   DEFAULT_CUSTOM_BED_GAIN_DB,
   BedType,
   ModeStyle,
+  SwitchDspOverride,
 } from '../shared/modes'
 
 const defaults: AppSettings = {
@@ -20,6 +21,7 @@ const defaults: AppSettings = {
   customBed: DEFAULT_CUSTOM_BED,
   customBedGainDb: DEFAULT_CUSTOM_BED_GAIN_DB,
   customStyle: { ...DEFAULT_CUSTOM_STYLE },
+  switchDspOverrides: {},
 }
 
 function getStorePath(): string {
@@ -27,12 +29,24 @@ function getStorePath(): string {
   return path.join(userDataPath, 'settings.json')
 }
 
+// Merge stored settings into defaults, deep-merging the nested objects so that
+// adding fields to ModeStyle / SwitchDspOverride later doesn't strand old users
+// with `undefined` for the new fields.
+function mergeSettings(stored: Partial<AppSettings>): AppSettings {
+  return {
+    ...defaults,
+    ...stored,
+    customStyle: { ...defaults.customStyle, ...(stored.customStyle ?? {}) },
+    switchDspOverrides: { ...defaults.switchDspOverrides, ...(stored.switchDspOverrides ?? {}) },
+  }
+}
+
 function readStore(): AppSettings {
   try {
     const data = fs.readFileSync(getStorePath(), 'utf-8')
-    return { ...defaults, ...JSON.parse(data) }
+    return mergeSettings(JSON.parse(data))
   } catch {
-    return { ...defaults }
+    return { ...defaults, customStyle: { ...defaults.customStyle }, switchDspOverrides: {} }
   }
 }
 
@@ -83,5 +97,16 @@ export function setCustomConfig(cfg: { bed: BedType; bedGainDb: number; style: M
   s.customBed = cfg.bed
   s.customBedGainDb = cfg.bedGainDb
   s.customStyle = cfg.style
+  writeStore(s)
+}
+
+// Replace the override block for one switch. Pass an empty object to clear (= revert to preset).
+export function setSwitchDspOverride(profileId: string, override: SwitchDspOverride): void {
+  const s = readStore()
+  if (Object.keys(override).length === 0) {
+    delete s.switchDspOverrides[profileId]
+  } else {
+    s.switchDspOverrides[profileId] = override
+  }
   writeStore(s)
 }
