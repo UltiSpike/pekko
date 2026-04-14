@@ -86,8 +86,8 @@
   --linear: #8be9fd; --tactile: #ffb86c; --clicky: #ff79c6;
 }
 
-/* ---- Gruvbox Dark (morhetz) — default ---- */
-:root, [data-theme="gruvbox"] {
+/* ---- Gruvbox Dark (morhetz) — default theme, applied when html has data-theme="gruvbox" ---- */
+[data-theme="gruvbox"] {
   --bg: rgba(40, 40, 40, 0.90);
   --surface-0: rgba(255, 255, 255, 0.03);
   --surface-1: rgba(255, 255, 255, 0.055);
