@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { audioEngine } from '../audio/AudioEngine'
+import type { Mode } from '@shared/modes'
 
 declare global {
   interface Window {
@@ -10,6 +11,8 @@ declare global {
       onVolumeChanged: (cb: (v: number) => void) => void
       onThemeChanged: (cb: (theme: string) => void) => void
       setTheme: (t: string) => Promise<boolean>
+      setMode: (m: string) => Promise<boolean>
+      setCustomConfig: (cfg: any) => Promise<boolean>
       getSettings: () => Promise<any>
       getProfiles: () => Promise<any>
       loadSoundPack: (id: string) => Promise<any>
@@ -21,7 +24,7 @@ declare global {
   }
 }
 
-export function useAudioEngine(activeProfileId: string, volume: number) {
+export function useAudioEngine(activeProfileId: string, volume: number, mode: Mode) {
   const [bluetoothWarning, setBluetoothWarning] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [wpm, setWpm] = useState(0)
@@ -77,6 +80,11 @@ export function useAudioEngine(activeProfileId: string, volume: number) {
   useEffect(() => {
     audioEngine.setVolume(volume)
   }, [volume])
+
+  // Mode (bed + style). Object identity drives re-apply — caller memoizes.
+  useEffect(() => {
+    audioEngine.setMode(mode)
+  }, [mode])
 
   return { bluetoothWarning, soundEnabled, wpm, typingActive }
 }

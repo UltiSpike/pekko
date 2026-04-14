@@ -64,11 +64,11 @@ function buildMenu(): Menu {
   return Menu.buildFromTemplate([
     { label: activeName, enabled: false },
     { type: 'separator' },
-    ...profileItems,
-    { type: 'separator' },
-    { label: `Vol ${volPct}%`, enabled: false },
-    ...volumeItems,
-    { type: 'separator' },
+    { label: 'Switch', submenu: profileItems },
+    {
+      label: `Volume · ${volPct}%`,
+      submenu: volumeItems,
+    },
     {
       label: 'Theme',
       submenu: THEMES.map((t) => ({

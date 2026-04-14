@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, nativeImage } from 'electron'
+import { app, BrowserWindow, globalShortcut } from 'electron'
 import path from 'path'
 import { startKeyboardListener, stopKeyboardListener } from './keyboard'
 import { registerIpcHandlers } from './ipc-handlers'
@@ -63,10 +63,9 @@ function createWindow() {
 app.on('ready', () => {
   console.log('[Pekko] App ready')
 
-  // Set dock icon (macOS)
+  // Hide dock icon on macOS — app lives in menu bar tray only
   if (process.platform === 'darwin' && app.dock) {
-    const dockIcon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'app-icon.icns'))
-    if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon)
+    app.dock.hide()
   }
 
   createWindow()

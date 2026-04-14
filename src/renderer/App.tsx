@@ -1,9 +1,20 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useProfiles } from './hooks/useProfiles'
 import VolumeSlider from './components/VolumeSlider'
 import PermissionBanner from './components/PermissionBanner'
 import TypingIndicator from './components/TypingIndicator'
+import TuneView from './components/TuneView'
+import {
+  MODES,
+  DEFAULT_MODE_ID,
+  DEFAULT_CUSTOM_STYLE,
+  DEFAULT_CUSTOM_BED,
+  DEFAULT_CUSTOM_BED_GAIN_DB,
+  buildCustomMode,
+  BedType,
+  ModeStyle,
+} from '@shared/modes'
 import './App.css'
 
 const hasApi = typeof window !== 'undefined' && !!window.api
@@ -17,14 +28,31 @@ const THEMES = [
   { id: 'gruvbox', name: 'Gruvbox' },
 ] as const
 
+// mode IDs for cycling: all presets + custom at the end
+const MODE_IDS = [...MODES.map(m => m.id), 'custom']
+
 export default function App() {
   const { profiles, loading } = useProfiles()
   const [activeProfile, setActiveProfile] = useState('cherrymx-black-abs')
   const [volume, setVolume] = useState(0.7)
   const [hasPermission, setHasPermission] = useState(true)
   const [theme, setTheme] = useState('gruvbox')
+  const [mode, setMode] = useState<string>(DEFAULT_MODE_ID)
 
-  const { bluetoothWarning, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume)
+  // Custom mode state (persisted)
+  const [customBed, setCustomBed] = useState<BedType>(DEFAULT_CUSTOM_BED)
+  const [customBedGainDb, setCustomBedGainDb] = useState<number>(DEFAULT_CUSTOM_BED_GAIN_DB)
+  const [customStyle, setCustomStyle] = useState<ModeStyle>({ ...DEFAULT_CUSTOM_STYLE })
+
+  const [isTuning, setIsTuning] = useState(false)
+
+  // Resolved active Mode (object) — memoized so the engine effect doesn't re-run on every render
+  const activeMode = useMemo(() => {
+    if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb)
+    return MODES.find(m => m.id === mode) ?? MODES[0]
+  }, [mode, customStyle, customBed, customBedGainDb])
+
+  const { bluetoothWarning, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode)
 
   // Load persisted settings
   useEffect(() => {
@@ -33,6 +61,10 @@ export default function App() {
       setActiveProfile(s.activeProfile)
       setVolume(s.volume)
       if (s.theme) setTheme(s.theme)
+      if (s.mode) setMode(s.mode)
+      if (s.customBed) setCustomBed(s.customBed)
+      if (typeof s.customBedGainDb === 'number') setCustomBedGainDb(s.customBedGainDb)
+      if (s.customStyle) setCustomStyle(s.customStyle)
     }).catch(console.error)
   }, [])
 
@@ -72,6 +104,42 @@ export default function App() {
     if (hasApi) await window.api.setTheme(id)
   }, [])
 
+  const handleModeChange = useCallback(async (id: string) => {
+    setMode(id)
+    if (hasApi) await window.api.setMode(id)
+  }, [])
+
+  // Custom config persistence — debounced is overkill; writes are tiny JSON
+  const persistCustom = useCallback(async (bed: BedType, bedGainDb: number, style: ModeStyle) => {
+    if (!hasApi) return
+    await window.api.setCustomConfig({ bed, bedGainDb, style })
+  }, [])
+
+  const handleCustomStyleChange = useCallback((style: ModeStyle) => {
+    setCustomStyle(style)
+    persistCustom(customBed, customBedGainDb, style)
+  }, [customBed, customBedGainDb, persistCustom])
+
+  const handleCustomBedChange = useCallback((bed: BedType) => {
+    setCustomBed(bed)
+    persistCustom(bed, customBedGainDb, customStyle)
+  }, [customBedGainDb, customStyle, persistCustom])
+
+  const handleCustomBedGainChange = useCallback((db: number) => {
+    setCustomBedGainDb(db)
+    persistCustom(customBed, db, customStyle)
+  }, [customBed, customStyle, persistCustom])
+
+  const resetCustom = useCallback(() => {
+    const bed = DEFAULT_CUSTOM_BED
+    const gain = DEFAULT_CUSTOM_BED_GAIN_DB
+    const style = { ...DEFAULT_CUSTOM_STYLE }
+    setCustomBed(bed)
+    setCustomBedGainDb(gain)
+    setCustomStyle(style)
+    persistCustom(bed, gain, style)
+  }, [persistCustom])
+
   const activeData = profiles.find(p => p.id === activeProfile)
   const activeIndex = profiles.findIndex(p => p.id === activeProfile)
   const isHQ = activeProfile.startsWith('cherrymx-') || activeProfile.startsWith('topre-purple') || activeProfile === 'nk-cream'
@@ -88,9 +156,16 @@ export default function App() {
     handleThemeChange(THEMES[next].id)
   }, [themeIndex, handleThemeChange])
 
+  const modeIdx = MODE_IDS.indexOf(mode)
+  const cycleMode = useCallback((dir: number) => {
+    const next = (modeIdx + dir + MODE_IDS.length) % MODE_IDS.length
+    handleModeChange(MODE_IDS[next])
+  }, [modeIdx, handleModeChange])
+
   // Keyboard: ← → profiles, Q/E themes
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isTuning) return // don't hijack keys while tuning
       if (e.key === 'ArrowLeft') cycleProfile(-1)
       else if (e.key === 'ArrowRight') cycleProfile(1)
       else if (e.key === 'q' || e.key === 'Q') cycleTheme(-1)
@@ -98,7 +173,24 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cycleProfile, cycleTheme])
+  }, [cycleProfile, cycleTheme, isTuning])
+
+  if (isTuning) {
+    return (
+      <div className="app">
+        <TuneView
+          bed={customBed}
+          bedGainDb={customBedGainDb}
+          style={customStyle}
+          onBedChange={handleCustomBedChange}
+          onBedGainChange={handleCustomBedGainChange}
+          onStyleChange={handleCustomStyleChange}
+          onReset={resetCustom}
+          onClose={() => setIsTuning(false)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="app">
@@ -125,6 +217,19 @@ export default function App() {
           Bluetooth detected — wired output recommended
         </div>
       )}
+
+      {/* Mode — the primary axis (bed + style) */}
+      <div className="mode-group" aria-label="Soundscape mode">
+        <div className="mode-nav">
+          <button className="nav-btn" onClick={() => cycleMode(-1)} aria-label="Previous mode">{'\u2039'}</button>
+          <div className="mode-name">{activeMode.name}</div>
+          <button className="nav-btn" onClick={() => cycleMode(1)} aria-label="Next mode">{'\u203a'}</button>
+        </div>
+        <div className="mode-description" aria-live="polite">{activeMode.description}</div>
+        {mode === 'custom' && (
+          <button className="mode-tune-btn" onClick={() => setIsTuning(true)}>Tune</button>
+        )}
+      </div>
 
       {/* Current profile */}
       <div className={`current-profile ${activeData ? `accent-${activeData.type}` : ''}`}>
