@@ -23,12 +23,6 @@ Flow-state audio for macOS · Made for deep work · Open source · Fully offline
 <!-- TODO: 30s screen recording — launch → type → switch profile → switch theme -->
 <!-- <p align="center"><img src="assets/preview.gif" width="640" /></p> -->
 
-Four **modes** shape how your typing feels — a brown-noise Deep Focus bed that disappears behind the work, pink-noise warmth for long writing, a thocky low-end that gives every keystroke satisfying weight, or full mechanical fidelity. Thirteen switch recordings underneath, spatially positioned across a 104-key stereo field.
-
-Pick a mode for the state you want to be in. The engine does the rest.
-
-&nbsp;
-
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```

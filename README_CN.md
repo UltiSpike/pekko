@@ -21,12 +21,6 @@ macOS 打字声景引擎 · 为深度工作设计 · 开源 · 完全离线
 <!-- TODO: 录屏 — 30s，展示启动→打字→切轴→切主题的完整流程 -->
 <!-- <p align="center"><img src="assets/preview.gif" width="640" /></p> -->
 
-四种 **Mode** 塑造打字的感觉 —— 棕噪声的 Deep Focus 让声音隐入工作背后，粉噪声的 Cozy Writing 陪伴长时间写作，Thock 用厚重的低频给每一击满足感，Classic Mech 还原机械键盘的全频真实。底层十三种轴体录音，按物理位置分布在 104 键的立体声场里。
-
-选你现在需要进入的状态，引擎负责其余的事。
-
-&nbsp;
-
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```
