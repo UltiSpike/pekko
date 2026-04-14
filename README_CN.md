@@ -4,9 +4,9 @@
 
 # Pekko
 
-**打字的质感。**
+**一席声景，契合你当下的状态。**
 
-macOS 键盘音效引擎 · 开源 · 完全离线
+macOS 打字声景引擎 · 为深度工作设计 · 开源 · 完全离线
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Apache_2.0-blue?style=flat-square" alt="License" /></a>
@@ -21,17 +21,11 @@ macOS 键盘音效引擎 · 开源 · 完全离线
 <!-- TODO: 录屏 — 30s，展示启动→打字→切轴→切主题的完整流程 -->
 <!-- <p align="center"><img src="assets/preview.gif" width="640" /></p> -->
 
-Cherry 蓝轴清脆的段落声。Topre 柔韧的触底。Holy Panda 回弹时短促的高频。
-
-十三种轴体录音，经空间声学引擎逐键定位在立体声场上。每一声，都在它该在的位置。
-
-&nbsp;
-
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```
 
-`←` `→` 切换轴体 · `Q` `E` 切换主题 · `⇧⌘K` 全局开关
+`‹` `›` 切换 Mode · `←` `→` 切换轴体 · `Q` `E` 切换主题 · `⇧⌘K` 全局开关
 
 <sub>macOS 11+ / Node 18+ / 首次启动需授予辅助功能权限 — 仅读取键码，不读取输入内容（<a href="PRIVACY.md">隐私声明</a>）</sub>
 
@@ -41,11 +35,24 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 &nbsp;
 
+## 四种 Mode
+
+| Mode | 底层声 | 性格 |
+|------|--------|------|
+| **Thock** · 默认 | 无 | 低频厚、暖空间、每一击都有重量感 |
+| Deep Focus | 棕噪声, -38 dB | 按键压暗，声音隐入工作背后 |
+| Cozy Writing | 粉噪声, -40 dB | 温暖粉噪 + 柔和按键，陪伴长时间写作 |
+| Classic Mech | 无 | 全频真实机械键盘还原 |
+
+&nbsp;
+
+---
+
+&nbsp;
+
 ## 声学引擎
 
-每次按键经过一条完整的房间声学处理链。低频塑形还原轴体的物理重量；中高频校正去除录音的数码刺感；12 毫秒延迟层模拟声音从桌面弹回的路径；104 个键按物理位置分布在立体声场的左右声道上。
-
-连续打字时，引擎自动衰减音量至稳态，停顿后回满。按键间隔越短力度越轻，越长越重。环境层以极低电平的棕噪声补充房间感。24 声部预分配，按键瞬间零分配、零 GC。端到端延迟低于 10 毫秒。
+按 Mode 变化：低频搁架、湿声比例、空气低通、逐键抖动。始终不变：24 声部池、104 键声像映射、端到端延迟 < 10 ms。
 
 <details>
 <summary>信号链与参数</summary>
@@ -53,20 +60,24 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 &nbsp;
 
 ```
-                       ┌──── 干声 (88%) ────┐
-  主增益 ──────────────┤                    ├── 低频搁架 ── 中频凹陷 ── 高频搁架 ── 空气LPF ── 压缩器 ──▶ 输出
-                       └── 12ms 延迟 ── 桌面LPF ── 湿声 (12%) ──┘
+                       ┌──── 干声 (82-88%) ────┐
+  主增益 ──────────────┤                       ├── 低频搁架 ── 中频凹陷 ── 高频搁架 ── 空气LPF ── 压缩器 ──▶ 输出
+                       └── 12ms 延迟 ── 桌面LPF ── 湿声 (12-18%) ──┘
+
+  底层声 (棕 | 粉) ───────────────────────────────────────────────▶ 输出 （绕过压缩器）
 ```
 
-| 节点 | 参数 |
-|------|------|
-| 低频搁架 | +2.5 dB @ 180 Hz |
-| 中频凹陷 | -3 dB @ 3.8 kHz, Q 1.5 |
-| 高频搁架 | +0.5 dB @ 9 kHz |
-| 空气低通 | 13 kHz, Q 0.5 |
-| 桌面反射 | 12ms delay → 3.5 kHz LPF, 12% wet |
-| 压缩器 | -18 dB threshold, 2.5:1, 35ms attack |
-| 环境层 | 棕噪声, 800 Hz bandpass, -35 dB |
+| 节点 | 默认 (Classic) | Mode 范围 |
+|------|----------------|-----------|
+| 低频搁架 @ 180 Hz | +2.5 dB | +2.5 到 +6 dB |
+| 湿声比例 | 12% | 12–18% |
+| 空气低通 | 13 kHz, Q 0.5 | 6.5–13 kHz |
+| 高频搁架 @ 9 kHz | +0.5 dB | -1 到 +0.5 dB |
+| 音高抖动 (±) | 2.5% | 0.3–2.5% |
+| 底层声 | — | 棕 / 粉 / 无, -38 到 -40 dB |
+| 中频凹陷 | -3 dB @ 3.8 kHz, Q 1.5 | 固定 |
+| 压缩器 | -18 dB, 2.5:1, 35 ms attack | 固定 |
+| 调度偏移 | 2 ms | 固定 |
 
 </details>
 
@@ -82,8 +93,6 @@ Cherry MX Black · Blue · Brown · Red · NK Cream · Topre Purple · Holy Pand
 
 Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 
-每把轴的音色差异来自录音本身。空间感、厚度、动态响应 —— 来自引擎。
-
 &nbsp;
 
 ---
@@ -92,11 +101,11 @@ Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 
 ## 拆开它
 
-Pekko 的每一层都可以打开。
+**Mode** — 每个预设是一个 `Mode` 对象：`bed`、`bedGainDb`、以及一组 `ModeStyle`（抖动、EQ 曲线、湿声比例）。在 [`src/shared/modes.ts`](src/shared/modes.ts) 中新增或微调。
 
 **轴体录音** — 把音频文件和 `config.json` 放进 `assets/sounds-hq/<id>/`，在 `profiles/index.json` 注册，启动即可。支持 sprite、multi、kbsim 三种格式。
 
-**引擎参数** — EQ 频点、压缩比、反射延迟、底噪电平，全在 [`AudioEngine.ts`](src/renderer/audio/AudioEngine.ts)。
+**引擎参数** — EQ 频点、压缩比、反射延迟，全在 [`AudioEngine.ts`](src/renderer/audio/AudioEngine.ts)。
 
 **视觉主题** — CSS 变量 + `data-theme`，一组颜色值就是一套新主题。
 
@@ -138,6 +147,7 @@ src/
 │   └── hooks/               # useAudioEngine, useProfiles
 └── shared/
     ├── types.ts
+    ├── modes.ts             # 4 个 Mode preset（bed + StyleLevel 组合）
     └── key-positions.ts     # 104 键声像映射
 ```
 

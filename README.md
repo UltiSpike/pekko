@@ -4,9 +4,9 @@
 
 # Pekko
 
-**The texture of typing.**
+**A typing soundscape, tuned to your mode.**
 
-Keyboard sound engine for macOS · Open source · Fully offline
+Flow-state audio for macOS · Made for deep work · Open source · Fully offline
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Apache_2.0-blue?style=flat-square" alt="License" /></a>
@@ -23,17 +23,11 @@ Keyboard sound engine for macOS · Open source · Fully offline
 <!-- TODO: 30s screen recording — launch → type → switch profile → switch theme -->
 <!-- <p align="center"><img src="assets/preview.gif" width="640" /></p> -->
 
-The crisp click of a Cherry Blue. The muted bottom-out of a Topre. The sharp snap of a Holy Panda on the way back up.
-
-Thirteen switch recordings, spatially positioned across a 104-key stereo field by an acoustic engine. Every sound, exactly where it belongs.
-
-&nbsp;
-
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```
 
-`←` `→` switch profiles · `Q` `E` switch themes · `⇧⌘K` global toggle
+`‹` `›` next mode · `←` `→` switch profiles · `Q` `E` switch themes · `⇧⌘K` global toggle
 
 <sub>macOS 11+ / Node 18+ / Accessibility permission required on first launch — reads keycodes only, never input content (<a href="PRIVACY.md">privacy statement</a>)</sub>
 
@@ -43,11 +37,24 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 &nbsp;
 
+## Four modes
+
+| Mode | Bed | Character |
+|------|-----|-----------|
+| **Thock** · default | — | Heavy low-end, warm decay, satisfying weight on every keystroke |
+| Deep Focus | brown, -38 dB | Muted keys behind a warm bed — disappear into the work |
+| Cozy Writing | pink, -40 dB | Softer keys with pink warmth — long sessions |
+| Classic Mech | — | Full mechanical fidelity, every switch as recorded |
+
+&nbsp;
+
+---
+
+&nbsp;
+
 ## Acoustic engine
 
-Every keypress passes through a room-acoustic processing chain. Low-shelf EQ restores the physical weight of each switch's thock. Mid-frequency correction removes the harshness that recordings pick up. A 12-millisecond delay layer models sound reflecting off the desk surface. All 104 keys are mapped to their physical position in the stereo field — A sits left, L sits right, spacebar dead center.
-
-During sustained typing, volume decays gently to a steady state and resets after a pause. Inter-key timing drives velocity — fast bursts register as light taps, slow deliberate strokes as heavier strikes. An ambient layer of brown noise at barely perceptible levels fills in the room. Twenty-four voices pre-allocated, zero GC on keypress. End-to-end latency under 10 milliseconds.
+Per-mode morph: low-shelf weight, wet mix, air LPF, per-key jitter. Constant across modes: 24-voice pool, 104-key stereo pan map, sub-10 ms end-to-end latency.
 
 <details>
 <summary>Signal chain & parameters</summary>
@@ -55,20 +62,24 @@ During sustained typing, volume decays gently to a steady state and resets after
 &nbsp;
 
 ```
-                       ┌──── dry (88%) ────┐
-  master gain ─────────┤                   ├── lowShelf ── midScoop ── highShelf ── airLPF ── compressor ──▶ out
-                       └── 12ms delay ── deskLPF ── wet (12%) ──┘
+                       ┌──── dry (82-88%) ────┐
+  master gain ─────────┤                      ├── lowShelf ── midScoop ── highShelf ── airLPF ── compressor ──▶ out
+                       └── 12 ms delay ── deskLPF ── wet (12-18%) ──┘
+
+  bed (brown | pink) ────────────────────────────────────────────────────────────────────▶ out  (bypasses compressor)
 ```
 
-| Node | Parameters |
-|------|------------|
-| Low shelf | +2.5 dB @ 180 Hz |
-| Mid scoop | -3 dB @ 3.8 kHz, Q 1.5 |
-| High shelf | +0.5 dB @ 9 kHz |
-| Air LPF | 13 kHz, Q 0.5 |
-| Desk reflection | 12ms delay → 3.5 kHz LPF, 12% wet |
-| Compressor | -18 dB threshold, 2.5:1, 35ms attack |
-| Ambient layer | Brown noise, 800 Hz bandpass, -35 dB |
+| Node | Default (Classic) | Mode range |
+|------|-------------------|------------|
+| Low shelf @ 180 Hz | +2.5 dB | +2.5 to +6 dB |
+| Wet mix | 12% | 12–18% |
+| Air LPF | 13 kHz, Q 0.5 | 6.5–13 kHz |
+| High shelf @ 9 kHz | +0.5 dB | -1 to +0.5 dB |
+| Pitch jitter (±) | 2.5% | 0.3–2.5% |
+| Bed | — | brown / pink / none, -38 to -40 dB |
+| Mid scoop | -3 dB @ 3.8 kHz, Q 1.5 | fixed |
+| Compressor | -18 dB, 2.5:1, 35 ms attack | fixed |
+| Schedule offset | 2 ms | fixed |
 
 </details>
 
@@ -84,8 +95,6 @@ Cherry MX Black · Blue · Brown · Red · NK Cream · Topre Purple · Holy Pand
 
 Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 
-The tonal character of each switch comes from the recording itself. Spatial depth, body, and dynamic response — from the engine.
-
 &nbsp;
 
 ---
@@ -94,11 +103,11 @@ The tonal character of each switch comes from the recording itself. Spatial dept
 
 ## Open it up
 
-Every layer of Pekko is accessible.
+**Modes** — Each preset is a `Mode` object: `bed`, `bedGainDb`, and a `ModeStyle` bundle (jitter, EQ shape, wet mix). Add or tweak in [`src/shared/modes.ts`](src/shared/modes.ts).
 
 **Switch recordings** — Drop audio files and a `config.json` into `assets/sounds-hq/<id>/`, register in `profiles/index.json`, run. Supports sprite, multi, and kbsim formats.
 
-**Engine parameters** — EQ points, compression ratio, reflection delay, ambient level — all in [`AudioEngine.ts`](src/renderer/audio/AudioEngine.ts).
+**Engine parameters** — EQ points, compression ratio, reflection delay — all in [`AudioEngine.ts`](src/renderer/audio/AudioEngine.ts).
 
 **Visual themes** — CSS variables + `data-theme`. A new colorscheme is one set of values.
 
@@ -141,6 +150,7 @@ src/
 │   └── hooks/               # useAudioEngine, useProfiles
 └── shared/
     ├── types.ts
+    ├── modes.ts             # 4 Mode presets (bed + StyleLevel bundles)
     └── key-positions.ts     # 104-key stereo pan map
 ```
 

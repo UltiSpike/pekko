@@ -1,4 +1,5 @@
 import { getKeyPan } from '@shared/key-positions'
+import { BedType, Mode, ModeStyle, dbToGain, getMode, DEFAULT_MODE_ID } from '@shared/modes'
 
 interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
 interface MultiPack {
@@ -16,7 +17,7 @@ interface VoiceSlot {
 const POOL_SIZE = 24
 const FADE_MS = 0.008
 const MAX_DUR = 0.40
-const SCHEDULE_OFFSET = 0.005 // #2: Fixed 5ms scheduling offset for jitter-free playback
+const SCHEDULE_OFFSET = 0.002 // #2: 2ms fixed scheduling offset — jitter-safe at modern latencyHint='interactive'
 const SPECIAL_KEYS: Record<number, string> = { 14: 'BACKSPACE', 28: 'ENTER', 41: 'ENTER', 57: 'SPACE' }
 
 export class AudioEngine {
@@ -59,17 +60,19 @@ export class AudioEngine {
     this.compressor.ratio.value = 2.5; this.compressor.attack.value = 0.035; this.compressor.release.value = 0.2
     this.compressor.connect(this.ctx.destination)
 
-    // High shelf: +0.5dB above 9kHz — subtle air, minimal long-term fatigue
+    // High shelf: mode-controlled, default +0.5dB at 9kHz
     const highShelf = this.ctx.createBiquadFilter()
     highShelf.type = 'highshelf'
     highShelf.frequency.value = 9000
-    highShelf.gain.value = 0.5
+    highShelf.gain.value = this.style.highShelfDb
+    this.highShelf = highShelf
 
-    // Air absorption LPF: 13kHz gentle rolloff — removes digital harshness
+    // Air LPF: mode-controlled, default 13kHz (Classic) / 8kHz (Focus)
     const airLPF = this.ctx.createBiquadFilter()
     airLPF.type = 'lowpass'
-    airLPF.frequency.value = 13000
+    airLPF.frequency.value = this.style.airLpfHz
     airLPF.Q.value = 0.5
+    this.airLPF = airLPF
     highShelf.connect(airLPF)
     airLPF.connect(this.compressor)
 
@@ -81,11 +84,12 @@ export class AudioEngine {
     midScoop.gain.value = -3
     midScoop.connect(highShelf)
 
-    // Low shelf: +2.5dB below 180Hz — warm thock without mud
+    // Low shelf: mode-controlled, default +2.5dB below 180Hz. Thock pushes this to +6dB for heavy bottom.
     const lowShelf = this.ctx.createBiquadFilter()
     lowShelf.type = 'lowshelf'
     lowShelf.frequency.value = 180
-    lowShelf.gain.value = 2.5
+    lowShelf.gain.value = this.style.lowShelfDb
+    this.lowShelf = lowShelf
     lowShelf.connect(midScoop)
 
     // Dry/wet desk reflection
@@ -101,7 +105,8 @@ export class AudioEngine {
     deskLPF.frequency.value = 3500
     deskLPF.Q.value = 0.7
     const wetGain = this.ctx.createGain()
-    wetGain.gain.value = 0.12
+    wetGain.gain.value = this.style.wetMix
+    this.wetGain = wetGain
     delay.connect(deskLPF)
     deskLPF.connect(wetGain)
     wetGain.connect(lowShelf)
@@ -112,7 +117,11 @@ export class AudioEngine {
 
     this.initPool()
     this.keepAlive()
-    console.log('[Audio] init: psychoacoustic chain (transient-safe comp + precise EQ + spatial + ambient)')
+
+    // Latency telemetry — useful when users report "slower"
+    const baseMs = ((this.ctx.baseLatency ?? 0) * 1000).toFixed(1)
+    const outMs = ((this.ctx.outputLatency ?? 0) * 1000).toFixed(1)
+    console.log(`[Audio] init: mode-driven engine · baseLatency=${baseMs}ms outputLatency=${outMs}ms schedOffset=${SCHEDULE_OFFSET * 1000}ms`)
   }
 
   // === #3: Typing intensity model ===
@@ -353,10 +362,11 @@ export class AudioEngine {
     const source = this.ctx.createBufferSource()
     source.buffer = buffer
 
-    // Keydown-keyup force correlation
-    let volIntensity = this.typingIntensity
+    // Mode-aware intensity. When locked (Focus / Cozy), keystrokes don't track inter-key timing.
+    const effectiveIntensity = this.style.intensityLocked ? 0.7 : this.typingIntensity
+    let volIntensity = effectiveIntensity
     if (type === 'down') {
-      this.keyIntensityMap.set(keycode, this.typingIntensity)
+      this.keyIntensityMap.set(keycode, effectiveIntensity)
     } else {
       // Heavy keydown → controlled release (quieter), light → loose bounce (louder)
       const downIntensity = this.keyIntensityMap.get(keycode) ?? 0.7
@@ -364,16 +374,19 @@ export class AudioEngine {
       volIntensity = 1.15 - downIntensity * 0.3
     }
 
-    // Pitch: intensity-driven + per-key character + jitter
-    const pitchBase = 1.0 + (1.0 - this.typingIntensity) * 0.03 - this.typingIntensity * 0.02
-    // Per-key character: Knuth hash → deterministic ±1% offset (simulates per-key physical variation)
+    // Pitch: only vary with intensity when NOT locked; always apply per-key character + mode-scoped jitter
+    const pitchBase = this.style.intensityLocked
+      ? 1.0
+      : 1.0 + (1.0 - this.typingIntensity) * 0.03 - this.typingIntensity * 0.02
     const keyChar = ((keycode * 2654435761 >>> 0) % 200 - 100) / 10000
-    source.playbackRate.value = pitchBase + keyChar + (Math.random() - 0.5) * 0.05 // ±2.5% jitter
+    const pitchJitter = (Math.random() - 0.5) * this.style.pitchJitter * 2 // symmetric ±
+    source.playbackRate.value = pitchBase + keyChar + pitchJitter
 
-    // Volume: intensity × adaptive × ducking × jitter
+    // Volume: intensity × adaptive × ducking × mode-scoped jitter
     const duckFactor = this.activeVoices > 8 ? 0.8 / Math.sqrt(this.activeVoices - 7) : 1.0
     const intensityVol = 0.5 + volIntensity * 0.5
-    const microRandom = 0.85 + Math.random() * 0.3 // ±15% (crosses 1dB perception threshold)
+    const volSpan = this.style.volumeJitter * 2
+    const microRandom = (1 - this.style.volumeJitter) + Math.random() * volSpan
     const finalVol = intensityVol * this.adaptiveMultiplier * duckFactor * microRandom
 
     slot.gain.gain.setValueAtTime(finalVol, playTime)
@@ -402,6 +415,7 @@ export class AudioEngine {
   setVolume(v: number) {
     this.baseVolume = Math.max(0, Math.min(1, v))
     if (this.masterGain) this.masterGain.gain.value = this.baseVolume
+    this.applyBedGain() // bed rides user volume too
   }
 
   // --- WPM tracking ---
@@ -426,6 +440,8 @@ export class AudioEngine {
   private _enabled = true
   get enabled() { return this._enabled }
   setEnabled(v: boolean) { this._enabled = v }
+
+  get mode() { return this.currentMode }
 
   resume() { if (this.ctx?.state === 'suspended') this.ctx.resume() }
 

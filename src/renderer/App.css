@@ -350,6 +350,190 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 input[type='range']::-webkit-slider-thumb:active { transform: scale(1.05); }
 
+/* ---- Mode (primary axis, same nav pattern as profile) ---- */
+.mode-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.mode-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mode-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  min-width: 96px;
+  text-align: center;
+  transition: color 200ms ease;
+}
+
+.mode-description {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0 6px;
+  min-height: 26px;
+  max-width: 240px;
+  transition: color 200ms ease;
+}
+
+.mode-tune-btn {
+  margin-top: 2px;
+  padding: 3px 12px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  transition: color 120ms, background 120ms, border-color 120ms;
+}
+.mode-tune-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border-focus);
+}
+
+/* ---- Tune view (Custom mode deep config) ---- */
+.tune-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 14px 14px 10px;
+  gap: 8px;
+  font-family: var(--font);
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.tune-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.tune-back, .tune-reset {
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  transition: color 120ms, background 120ms;
+}
+.tune-back { font-size: 18px; padding: 0 8px; }
+.tune-back:hover, .tune-reset:hover {
+  color: var(--text);
+  background: var(--surface-1);
+}
+
+.tune-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.tune-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px;
+  -webkit-app-region: no-drag;
+}
+
+.tune-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tune-section-label,
+.tune-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tune-bed-options {
+  display: flex;
+  gap: 4px;
+}
+.tune-bed-chip {
+  flex: 1;
+  padding: 5px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  transition: color 120ms, background 120ms, border-color 120ms;
+}
+.tune-bed-chip:hover {
+  color: var(--text);
+  background: var(--surface-1);
+}
+.tune-bed-chip.on {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: var(--border-focus);
+}
+
+.tune-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tune-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tune-value {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.tune-footer {
+  font-size: 9px;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 4px 0 2px;
+  letter-spacing: 0.3px;
+}
+
 /* ---- Typing indicator ---- */
 .typing-indicator {
   display: flex;
