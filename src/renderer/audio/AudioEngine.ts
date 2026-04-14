@@ -1,4 +1,5 @@
 import { getKeyPan } from '@shared/key-positions'
+import { BedType, Mode, ModeStyle, dbToGain, getMode, DEFAULT_MODE_ID } from '@shared/modes'
 
 interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
 interface MultiPack {
@@ -16,7 +17,7 @@ interface VoiceSlot {
 const POOL_SIZE = 24
 const FADE_MS = 0.008
 const MAX_DUR = 0.40
-const SCHEDULE_OFFSET = 0.005 // #2: Fixed 5ms scheduling offset for jitter-free playback
+const SCHEDULE_OFFSET = 0.002 // #2: 2ms fixed scheduling offset — jitter-safe at modern latencyHint='interactive'
 const SPECIAL_KEYS: Record<number, string> = { 14: 'BACKSPACE', 28: 'ENTER', 41: 'ENTER', 57: 'SPACE' }
 
 export class AudioEngine {
@@ -34,11 +35,21 @@ export class AudioEngine {
   private typingIntensity = 0.7  // 0.3 (gentle) → 1.0 (forceful)
   private keyIntensityMap = new Map<number, number>() // keycode → keydown intensity for keyup correlation
 
-  // #4: Ambient noise layer
-  private ambientGain: GainNode | null = null
-  private ambientSource: AudioBufferSourceNode | null = null
-  private ambientFadeTimer: ReturnType<typeof setTimeout> | null = null
-  private ambientActive = false
+  // #4: Ambient bed layer (continuous while mode calls for it — bed IS the mode)
+  private bedGain: GainNode | null = null
+  private bedSource: AudioBufferSourceNode | null = null
+  private bedType: BedType = 'none'
+  private bedBaseGainDb = -80 // current mode's target in dB (before volume)
+
+  // Filter / mix refs — style morph changes these per-mode
+  private airLPF: BiquadFilterNode | null = null
+  private highShelf: BiquadFilterNode | null = null
+  private lowShelf: BiquadFilterNode | null = null
+  private wetGain: GainNode | null = null
+
+  // Current mode & style — read on every playSound
+  private currentMode: Mode = getMode(DEFAULT_MODE_ID)
+  private get style(): ModeStyle { return this.currentMode.style }
 
   // #5: Adaptive volume decay
   private baseVolume = 1.0         // user-set volume
@@ -65,17 +76,19 @@ export class AudioEngine {
     this.compressor.ratio.value = 2.5; this.compressor.attack.value = 0.035; this.compressor.release.value = 0.2
     this.compressor.connect(this.ctx.destination)
 
-    // High shelf: +0.5dB above 9kHz — subtle air, minimal long-term fatigue
+    // High shelf: mode-controlled, default +0.5dB at 9kHz
     const highShelf = this.ctx.createBiquadFilter()
     highShelf.type = 'highshelf'
     highShelf.frequency.value = 9000
-    highShelf.gain.value = 0.5
+    highShelf.gain.value = this.style.highShelfDb
+    this.highShelf = highShelf
 
-    // Air absorption LPF: 13kHz gentle rolloff — removes digital harshness
+    // Air LPF: mode-controlled, default 13kHz (Classic) / 8kHz (Focus)
     const airLPF = this.ctx.createBiquadFilter()
     airLPF.type = 'lowpass'
-    airLPF.frequency.value = 13000
+    airLPF.frequency.value = this.style.airLpfHz
     airLPF.Q.value = 0.5
+    this.airLPF = airLPF
     highShelf.connect(airLPF)
     airLPF.connect(this.compressor)
 
@@ -87,11 +100,12 @@ export class AudioEngine {
     midScoop.gain.value = -3
     midScoop.connect(highShelf)
 
-    // Low shelf: +2.5dB below 180Hz — warm thock without mud
+    // Low shelf: mode-controlled, default +2.5dB below 180Hz. Thock pushes this to +6dB for heavy bottom.
     const lowShelf = this.ctx.createBiquadFilter()
     lowShelf.type = 'lowshelf'
     lowShelf.frequency.value = 180
-    lowShelf.gain.value = 2.5
+    lowShelf.gain.value = this.style.lowShelfDb
+    this.lowShelf = lowShelf
     lowShelf.connect(midScoop)
 
     // Dry/wet desk reflection
@@ -107,7 +121,8 @@ export class AudioEngine {
     deskLPF.frequency.value = 3500
     deskLPF.Q.value = 0.7
     const wetGain = this.ctx.createGain()
-    wetGain.gain.value = 0.12
+    wetGain.gain.value = this.style.wetMix
+    this.wetGain = wetGain
     delay.connect(deskLPF)
     deskLPF.connect(wetGain)
     wetGain.connect(lowShelf)
@@ -116,73 +131,120 @@ export class AudioEngine {
     this.masterGain.connect(dryGain)
     this.masterGain.connect(delay)
 
-    // === Ambient brown noise (bandpass-shaped for room character) ===
-    this.ambientGain = this.ctx.createGain()
-    this.ambientGain.gain.value = 0  // starts silent
-    const ambientBP = this.ctx.createBiquadFilter()
-    ambientBP.type = 'bandpass'
-    ambientBP.frequency.value = 800
-    ambientBP.Q.value = 0.5
-    this.ambientGain.connect(ambientBP)
-    ambientBP.connect(this.compressor)
-    this.startAmbientNoise()
+    // === Persistent bed layer — bypasses compressor so it won't duck keystrokes ===
+    this.bedGain = this.ctx.createGain()
+    this.bedGain.gain.value = 0 // starts silent — setMode ramps it up
+    const bedBP = this.ctx.createBiquadFilter()
+    bedBP.type = 'lowpass'
+    bedBP.frequency.value = 2000 // bed is low/mid-focused by design
+    bedBP.Q.value = 0.5
+    this.bedGain.connect(bedBP)
+    bedBP.connect(this.ctx.destination) // direct — never touched by keystroke compression
 
     this.initPool()
     this.keepAlive()
-    console.log('[Audio] init: psychoacoustic chain (transient-safe comp + precise EQ + spatial + ambient)')
+
+    // Latency telemetry — useful when users report "slower"
+    const baseMs = ((this.ctx.baseLatency ?? 0) * 1000).toFixed(1)
+    const outMs = ((this.ctx.outputLatency ?? 0) * 1000).toFixed(1)
+    console.log(`[Audio] init: mode-driven engine · baseLatency=${baseMs}ms outputLatency=${outMs}ms schedOffset=${SCHEDULE_OFFSET * 1000}ms`)
   }
 
-  // === #4: Brown noise generator (runs continuously at ~-35dB when typing) ===
-  private startAmbientNoise() {
-    if (!this.ctx || !this.ambientGain) return
-
-    // Generate 2 seconds of brown noise (random walk, low-pass filtered)
-    const sr = this.ctx.sampleRate
-    const len = sr * 2
-    const buf = this.ctx.createBuffer(2, len, sr)
-
+  // === Noise generators (continuous loops, shaped by bed bandpass) ===
+  private makeBrownNoise(seconds: number): AudioBuffer {
+    const sr = this.ctx!.sampleRate
+    const len = sr * seconds
+    const buf = this.ctx!.createBuffer(2, len, sr)
     for (let ch = 0; ch < 2; ch++) {
-      const data = buf.getChannelData(ch)
-      let val = 0
+      const d = buf.getChannelData(ch)
+      let v = 0
       for (let i = 0; i < len; i++) {
-        val += (Math.random() * 2 - 1) * 0.02
-        val *= 0.998 // slight decay to prevent drift
-        data[i] = val
+        v += (Math.random() * 2 - 1) * 0.02
+        v *= 0.998
+        d[i] = v
       }
-      // Normalize
       let max = 0
-      for (let i = 0; i < len; i++) max = Math.max(max, Math.abs(data[i]))
-      if (max > 0) for (let i = 0; i < len; i++) data[i] /= max
+      for (let i = 0; i < len; i++) max = Math.max(max, Math.abs(d[i]))
+      if (max > 0) for (let i = 0; i < len; i++) d[i] /= max
+    }
+    return buf
+  }
+
+  // Pink noise via Paul Kellet's IIR approximation — -3dB/octave slope
+  private makePinkNoise(seconds: number): AudioBuffer {
+    const sr = this.ctx!.sampleRate
+    const len = sr * seconds
+    const buf = this.ctx!.createBuffer(2, len, sr)
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch)
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1
+        b0 = 0.99886 * b0 + w * 0.0555179
+        b1 = 0.99332 * b1 + w * 0.0750759
+        b2 = 0.96900 * b2 + w * 0.1538520
+        b3 = 0.86650 * b3 + w * 0.3104856
+        b4 = 0.55000 * b4 + w * 0.5329522
+        b5 = -0.7616 * b5 - w * 0.0168980
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11
+        b6 = w * 0.115926
+      }
+    }
+    return buf
+  }
+
+  private startBed(type: BedType) {
+    if (!this.ctx || !this.bedGain) return
+    // Stop previous source
+    if (this.bedSource) {
+      try { this.bedSource.stop(); this.bedSource.disconnect() } catch {}
+      this.bedSource = null
+    }
+    this.bedType = type
+    if (type === 'none') return
+    const buf = type === 'brown' ? this.makeBrownNoise(2) : this.makePinkNoise(2)
+    this.bedSource = this.ctx.createBufferSource()
+    this.bedSource.buffer = buf
+    this.bedSource.loop = true
+    this.bedSource.connect(this.bedGain)
+    this.bedSource.start()
+  }
+
+  // === Mode switching — applies bed + style atomically ===
+  // Accepts a Mode object (not just id) so the caller can pass a runtime-assembled Custom mode.
+  setMode(modeOrId: string | Mode) {
+    const mode = typeof modeOrId === 'string' ? getMode(modeOrId) : modeOrId
+    this.currentMode = mode
+    this.bedBaseGainDb = mode.bedGainDb
+
+    // Style → filters + desk mix (smoothed, atomic)
+    if (this.ctx && this.airLPF && this.highShelf && this.lowShelf && this.wetGain) {
+      const now = this.ctx.currentTime
+      const rampEnd = now + 0.3
+      const rampParam = (p: AudioParam, target: number) => {
+        p.cancelScheduledValues(now)
+        p.setValueAtTime(p.value, now)
+        p.linearRampToValueAtTime(target, rampEnd)
+      }
+      rampParam(this.airLPF.frequency, mode.style.airLpfHz)
+      rampParam(this.highShelf.gain, mode.style.highShelfDb)
+      rampParam(this.lowShelf.gain, mode.style.lowShelfDb)
+      rampParam(this.wetGain.gain, mode.style.wetMix)
     }
 
-    this.ambientSource = this.ctx.createBufferSource()
-    this.ambientSource.buffer = buf
-    this.ambientSource.loop = true
-    this.ambientSource.connect(this.ambientGain)
-    this.ambientSource.start()
+    // Bed → swap source if type changed, ramp gain
+    if (mode.bed !== this.bedType) this.startBed(mode.bed)
+    this.applyBedGain()
+    console.log(`[Audio] mode=${mode.id} bed=${mode.bed} style=airLPF ${mode.style.airLpfHz}Hz jitter=${mode.style.pitchJitter}`)
   }
 
-  private fadeAmbientIn() {
-    if (!this.ctx || !this.ambientGain || this.ambientActive) return
-    this.ambientActive = true
-    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
-
+  private applyBedGain() {
+    if (!this.ctx || !this.bedGain) return
+    const target = this.bedType === 'none' ? 0 : dbToGain(this.bedBaseGainDb) * this.baseVolume
     const now = this.ctx.currentTime
-    this.ambientGain.gain.cancelScheduledValues(now)
-    this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now)
-    this.ambientGain.gain.linearRampToValueAtTime(0.018, now + 0.5) // -35dB, fade in 500ms
-  }
-
-  private scheduleAmbientFadeOut() {
-    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
-    this.ambientFadeTimer = setTimeout(() => {
-      if (!this.ctx || !this.ambientGain) return
-      this.ambientActive = false
-      const now = this.ctx.currentTime
-      this.ambientGain.gain.cancelScheduledValues(now)
-      this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now)
-      this.ambientGain.gain.linearRampToValueAtTime(0, now + 1.5) // fade out 1.5s
-    }, 2000) // 2 seconds after last keypress
+    this.bedGain.gain.cancelScheduledValues(now)
+    this.bedGain.gain.setValueAtTime(this.bedGain.gain.value, now)
+    this.bedGain.gain.linearRampToValueAtTime(target, now + 0.4)
   }
 
   // === #3: Typing intensity model ===
@@ -400,9 +462,7 @@ export class AudioEngine {
     this.updateIntensity()
     // #5: Update adaptive volume
     this.updateAdaptiveVolume()
-    // #4: Ambient noise management
-    this.fadeAmbientIn()
-    this.scheduleAmbientFadeOut()
+    // (bed is continuous per-mode — no per-key ambient gating anymore)
 
     let buffer: AudioBuffer | null | undefined
 
@@ -426,10 +486,11 @@ export class AudioEngine {
     const source = this.ctx.createBufferSource()
     source.buffer = buffer
 
-    // Keydown-keyup force correlation
-    let volIntensity = this.typingIntensity
+    // Mode-aware intensity. When locked (Focus / Cozy), keystrokes don't track inter-key timing.
+    const effectiveIntensity = this.style.intensityLocked ? 0.7 : this.typingIntensity
+    let volIntensity = effectiveIntensity
     if (type === 'down') {
-      this.keyIntensityMap.set(keycode, this.typingIntensity)
+      this.keyIntensityMap.set(keycode, effectiveIntensity)
     } else {
       // Heavy keydown → controlled release (quieter), light → loose bounce (louder)
       const downIntensity = this.keyIntensityMap.get(keycode) ?? 0.7
@@ -437,16 +498,19 @@ export class AudioEngine {
       volIntensity = 1.15 - downIntensity * 0.3
     }
 
-    // Pitch: intensity-driven + per-key character + jitter
-    const pitchBase = 1.0 + (1.0 - this.typingIntensity) * 0.03 - this.typingIntensity * 0.02
-    // Per-key character: Knuth hash → deterministic ±1% offset (simulates per-key physical variation)
+    // Pitch: only vary with intensity when NOT locked; always apply per-key character + mode-scoped jitter
+    const pitchBase = this.style.intensityLocked
+      ? 1.0
+      : 1.0 + (1.0 - this.typingIntensity) * 0.03 - this.typingIntensity * 0.02
     const keyChar = ((keycode * 2654435761 >>> 0) % 200 - 100) / 10000
-    source.playbackRate.value = pitchBase + keyChar + (Math.random() - 0.5) * 0.05 // ±2.5% jitter
+    const pitchJitter = (Math.random() - 0.5) * this.style.pitchJitter * 2 // symmetric ±
+    source.playbackRate.value = pitchBase + keyChar + pitchJitter
 
-    // Volume: intensity × adaptive × ducking × jitter
+    // Volume: intensity × adaptive × ducking × mode-scoped jitter
     const duckFactor = this.activeVoices > 8 ? 0.8 / Math.sqrt(this.activeVoices - 7) : 1.0
     const intensityVol = 0.5 + volIntensity * 0.5
-    const microRandom = 0.85 + Math.random() * 0.3 // ±15% (crosses 1dB perception threshold)
+    const volSpan = this.style.volumeJitter * 2
+    const microRandom = (1 - this.style.volumeJitter) + Math.random() * volSpan
     const finalVol = intensityVol * this.adaptiveMultiplier * duckFactor * microRandom
 
     slot.gain.gain.setValueAtTime(finalVol, playTime)
@@ -475,6 +539,7 @@ export class AudioEngine {
   setVolume(v: number) {
     this.baseVolume = Math.max(0, Math.min(1, v))
     if (this.masterGain) this.masterGain.gain.value = this.baseVolume
+    this.applyBedGain() // bed rides user volume too
   }
 
   // --- WPM tracking ---
@@ -500,6 +565,8 @@ export class AudioEngine {
   get enabled() { return this._enabled }
   setEnabled(v: boolean) { this._enabled = v }
 
+  get mode() { return this.currentMode }
+
   resume() { if (this.ctx?.state === 'suspended') this.ctx.resume() }
 
   // --- Cleanup (prevents memory leaks) ---
@@ -514,12 +581,11 @@ export class AudioEngine {
     }
     this.activeVoices = 0
 
-    // Stop ambient
-    if (this.ambientSource) {
-      try { this.ambientSource.stop(); this.ambientSource.disconnect() } catch {}
-      this.ambientSource = null
+    // Stop bed
+    if (this.bedSource) {
+      try { this.bedSource.stop(); this.bedSource.disconnect() } catch {}
+      this.bedSource = null
     }
-    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
     if (this.adaptiveTimer) clearTimeout(this.adaptiveTimer)
     if (this.typingTimeout) clearTimeout(this.typingTimeout)
 
@@ -531,7 +597,11 @@ export class AudioEngine {
 
     this.masterGain = null
     this.compressor = null
-    this.ambientGain = null
+    this.bedGain = null
+    this.airLPF = null
+    this.highShelf = null
+    this.lowShelf = null
+    this.wetGain = null
     this.pool = []
     this.packs.clear()
     this.keyIntensityMap.clear()

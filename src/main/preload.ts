@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('api', {
   onVolumeChanged: (cb: (v: number) => void) => { volumeChangedCallback = cb },
   onThemeChanged: (cb: (theme: string) => void) => { themeChangedCallback = cb },
   setTheme:        (t: string)  => ipcRenderer.invoke('set-theme', t),
+  setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
+  setCustomConfig: (cfg: any)   => ipcRenderer.invoke('set-custom-config', cfg),
   getSettings:       ()            => ipcRenderer.invoke('get-settings'),
   getProfiles:       ()            => ipcRenderer.invoke('get-profiles'),
   loadSoundPack:     (id: string)  => ipcRenderer.invoke('load-sound-pack', id),

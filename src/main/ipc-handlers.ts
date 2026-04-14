@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { getSettings, setProfile, setVolume, setTheme } from './store'
+import { getSettings, setProfile, setVolume, setTheme, setMode, setCustomConfig } from './store'
+import type { BedType, ModeStyle } from '../shared/modes'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
 import { rebuildTrayMenu } from './tray'
 
@@ -132,6 +133,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('set-profile', (_event, id: string) => { setProfile(id); rebuildTrayMenu(); return true })
   ipcMain.handle('set-volume', (_event, v: number) => { setVolume(v); rebuildTrayMenu(); return true })
   ipcMain.handle('set-theme', (_event, t: string) => { setTheme(t); rebuildTrayMenu(); return true })
+  ipcMain.handle('set-mode', (_event, m: string) => { setMode(m); return true })
+  ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle }) => {
+    setCustomConfig(cfg)
+    return true
+  })
   ipcMain.handle('check-permissions', () => checkAccessibilityPermission())
   ipcMain.handle('request-permissions', () => { requestAccessibilityPermission(); return true })
 }
