@@ -52,9 +52,7 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 ## 声学引擎
 
-每次按键经过一条 EQ + 桌面反射 + 立体声分布的心理声学链。按 Mode 变化的：低频搁架的厚度、湿声比例、空气低通的上限、逐键抖动幅度。始终不变的：24 声部池、104 键声像映射、端到端延迟低于 10 毫秒。
-
-底层声（棕噪声 / 粉噪声）在渲染进程实时合成，**绕过按键压缩器** —— 所以它永远不会把你的 keystroke transient 压下去。固定 2 ms 的调度偏移保证时序稳定而不引入感知延迟。
+按 Mode 变化：低频搁架、湿声比例、空气低通、逐键抖动。始终不变：24 声部池、104 键声像映射、端到端延迟 < 10 ms。
 
 <details>
 <summary>信号链与参数</summary>
@@ -95,8 +93,6 @@ Cherry MX Black · Blue · Brown · Red · NK Cream · Topre Purple · Holy Pand
 
 Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 
-轴体决定每次按键的**材质**；Mode 决定你**如何感受它**。两者正交——同一条 Holy Panda 录音，在 Thock 和 Deep Focus 下听起来像是两把不同的键盘。
-
 &nbsp;
 
 ---
@@ -104,8 +100,6 @@ Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 &nbsp;
 
 ## 拆开它
-
-Pekko 的每一层都可以打开。
 
 **Mode** — 每个预设是一个 `Mode` 对象：`bed`、`bedGainDb`、以及一组 `ModeStyle`（抖动、EQ 曲线、湿声比例）。在 [`src/shared/modes.ts`](src/shared/modes.ts) 中新增或微调。
 
