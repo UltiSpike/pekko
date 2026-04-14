@@ -1,5 +1,5 @@
 import { getKeyPan } from '@shared/key-positions'
-import { BedType, Mode, ModeStyle, dbToGain, getMode, DEFAULT_MODE_ID } from '@shared/modes'
+import { Mode, ModeStyle, getMode, DEFAULT_MODE_ID } from '@shared/modes'
 
 interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
 interface MultiPack {
@@ -34,6 +34,16 @@ export class AudioEngine {
   private lastKeyTime = 0
   private typingIntensity = 0.7  // 0.3 (gentle) → 1.0 (forceful)
   private keyIntensityMap = new Map<number, number>() // keycode → keydown intensity for keyup correlation
+
+  // Filter / mix refs — style morph changes these per-mode
+  private airLPF: BiquadFilterNode | null = null
+  private highShelf: BiquadFilterNode | null = null
+  private lowShelf: BiquadFilterNode | null = null
+  private wetGain: GainNode | null = null
+
+  // Current mode & style — read on every playSound
+  private currentMode: Mode = getMode(DEFAULT_MODE_ID)
+  private get style(): ModeStyle { return this.currentMode.style }
 
   // #5: Adaptive volume decay
   private baseVolume = 1.0         // user-set volume
@@ -98,7 +108,7 @@ export class AudioEngine {
     dryGain.connect(lowShelf)
 
     const delay = this.ctx.createDelay(0.1)
-    delay.delayTime.value = 0.012
+    delay.delayTime.value = 0.004
     // Desk surface LPF: wood/plastic absorbs >3.5kHz — warm reflection
     const deskLPF = this.ctx.createBiquadFilter()
     deskLPF.type = 'lowpass'
@@ -122,6 +132,26 @@ export class AudioEngine {
     const baseMs = ((this.ctx.baseLatency ?? 0) * 1000).toFixed(1)
     const outMs = ((this.ctx.outputLatency ?? 0) * 1000).toFixed(1)
     console.log(`[Audio] init: mode-driven engine · baseLatency=${baseMs}ms outputLatency=${outMs}ms schedOffset=${SCHEDULE_OFFSET * 1000}ms`)
+  }
+
+  // === Mode switching — applies style atomically (no bed) ===
+  setMode(modeOrId: string | Mode) {
+    const mode = typeof modeOrId === 'string' ? getMode(modeOrId) : modeOrId
+    this.currentMode = mode
+    if (this.ctx && this.airLPF && this.highShelf && this.lowShelf && this.wetGain) {
+      const now = this.ctx.currentTime
+      const rampEnd = now + 0.3
+      const rampParam = (p: AudioParam, target: number) => {
+        p.cancelScheduledValues(now)
+        p.setValueAtTime(p.value, now)
+        p.linearRampToValueAtTime(target, rampEnd)
+      }
+      rampParam(this.airLPF.frequency, mode.style.airLpfHz)
+      rampParam(this.highShelf.gain, mode.style.highShelfDb)
+      rampParam(this.lowShelf.gain, mode.style.lowShelfDb)
+      rampParam(this.wetGain.gain, mode.style.wetMix)
+    }
+    console.log(`[Audio] mode=${mode.id} style=airLPF ${mode.style.airLpfHz}Hz jitter=${mode.style.pitchJitter}`)
   }
 
   // === #3: Typing intensity model ===
@@ -215,7 +245,7 @@ export class AudioEngine {
   private async decodeData(data: Uint8Array | Record<string, number>): Promise<AudioBuffer | null> {
     try {
       let ab: ArrayBuffer
-      if (data instanceof Uint8Array) ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      if (data instanceof Uint8Array) ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
       else { const v = Object.keys(data).sort((a, b) => +a - +b).map(k => (data as any)[k]); ab = new Uint8Array(v).buffer }
       return await this.ctx!.decodeAudioData(ab)
     } catch { return null }
@@ -415,7 +445,6 @@ export class AudioEngine {
   setVolume(v: number) {
     this.baseVolume = Math.max(0, Math.min(1, v))
     if (this.masterGain) this.masterGain.gain.value = this.baseVolume
-    this.applyBedGain() // bed rides user volume too
   }
 
   // --- WPM tracking ---
@@ -468,6 +497,10 @@ export class AudioEngine {
 
     this.masterGain = null
     this.compressor = null
+    this.airLPF = null
+    this.highShelf = null
+    this.lowShelf = null
+    this.wetGain = null
     this.pool = []
     this.packs.clear()
     this.keyIntensityMap.clear()
