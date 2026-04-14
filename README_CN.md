@@ -105,24 +105,6 @@ Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 
 &nbsp;
 
-## 拆开它
-
-**Mode** — 每个预设是一个 `Mode` 对象：`bed`、`bedGainDb`、以及一组 `ModeStyle`（抖动、EQ 曲线、湿声比例）。在 [`src/shared/modes.ts`](src/shared/modes.ts) 中新增或微调。
-
-**轴体录音** — 把音频文件和 `config.json` 放进 `assets/sounds-hq/<id>/`，在 `profiles/index.json` 注册，启动即可。支持 sprite、multi、kbsim 三种格式。
-
-**引擎参数** — EQ 频点、压缩比、反射延迟，全在 [`AudioEngine.ts`](src/renderer/audio/AudioEngine.ts)。
-
-**视觉主题** — CSS 变量 + `data-theme`，一组颜色值就是一套新主题。
-
-[SOUNDS.md](SOUNDS.md) · [DESIGN.md](DESIGN.md)
-
-&nbsp;
-
----
-
-&nbsp;
-
 <details>
 <summary>架构</summary>
 

@@ -107,24 +107,6 @@ Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 
 &nbsp;
 
-## Open it up
-
-**Modes** — Each preset is a `Mode` object: `bed`, `bedGainDb`, and a `ModeStyle` bundle (jitter, EQ shape, wet mix). Add or tweak in [`src/shared/modes.ts`](src/shared/modes.ts).
-
-**Switch recordings** — Drop audio files and a `config.json` into `assets/sounds-hq/<id>/`, register in `profiles/index.json`, run. Supports sprite, multi, and kbsim formats.
-
-**Engine parameters** — EQ points, compression ratio, reflection delay — all in [`AudioEngine.ts`](src/renderer/audio/AudioEngine.ts).
-
-**Visual themes** — CSS variables + `data-theme`. A new colorscheme is one set of values.
-
-[SOUNDS.md](SOUNDS.md) · [DESIGN.md](DESIGN.md)
-
-&nbsp;
-
----
-
-&nbsp;
-
 <details>
 <summary>Architecture</summary>
 
