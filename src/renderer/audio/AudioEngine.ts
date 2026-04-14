@@ -34,12 +34,6 @@ export class AudioEngine {
   private typingIntensity = 0.7  // 0.3 (gentle) → 1.0 (forceful)
   private keyIntensityMap = new Map<number, number>() // keycode → keydown intensity for keyup correlation
 
-  // #4: Ambient noise layer
-  private ambientGain: GainNode | null = null
-  private ambientSource: AudioBufferSourceNode | null = null
-  private ambientFadeTimer: ReturnType<typeof setTimeout> | null = null
-  private ambientActive = false
-
   // #5: Adaptive volume decay
   private baseVolume = 1.0         // user-set volume
   private adaptiveMultiplier = 1.0 // decays during sustained typing
@@ -116,73 +110,9 @@ export class AudioEngine {
     this.masterGain.connect(dryGain)
     this.masterGain.connect(delay)
 
-    // === Ambient brown noise (bandpass-shaped for room character) ===
-    this.ambientGain = this.ctx.createGain()
-    this.ambientGain.gain.value = 0  // starts silent
-    const ambientBP = this.ctx.createBiquadFilter()
-    ambientBP.type = 'bandpass'
-    ambientBP.frequency.value = 800
-    ambientBP.Q.value = 0.5
-    this.ambientGain.connect(ambientBP)
-    ambientBP.connect(this.compressor)
-    this.startAmbientNoise()
-
     this.initPool()
     this.keepAlive()
     console.log('[Audio] init: psychoacoustic chain (transient-safe comp + precise EQ + spatial + ambient)')
-  }
-
-  // === #4: Brown noise generator (runs continuously at ~-35dB when typing) ===
-  private startAmbientNoise() {
-    if (!this.ctx || !this.ambientGain) return
-
-    // Generate 2 seconds of brown noise (random walk, low-pass filtered)
-    const sr = this.ctx.sampleRate
-    const len = sr * 2
-    const buf = this.ctx.createBuffer(2, len, sr)
-
-    for (let ch = 0; ch < 2; ch++) {
-      const data = buf.getChannelData(ch)
-      let val = 0
-      for (let i = 0; i < len; i++) {
-        val += (Math.random() * 2 - 1) * 0.02
-        val *= 0.998 // slight decay to prevent drift
-        data[i] = val
-      }
-      // Normalize
-      let max = 0
-      for (let i = 0; i < len; i++) max = Math.max(max, Math.abs(data[i]))
-      if (max > 0) for (let i = 0; i < len; i++) data[i] /= max
-    }
-
-    this.ambientSource = this.ctx.createBufferSource()
-    this.ambientSource.buffer = buf
-    this.ambientSource.loop = true
-    this.ambientSource.connect(this.ambientGain)
-    this.ambientSource.start()
-  }
-
-  private fadeAmbientIn() {
-    if (!this.ctx || !this.ambientGain || this.ambientActive) return
-    this.ambientActive = true
-    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
-
-    const now = this.ctx.currentTime
-    this.ambientGain.gain.cancelScheduledValues(now)
-    this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now)
-    this.ambientGain.gain.linearRampToValueAtTime(0.018, now + 0.5) // -35dB, fade in 500ms
-  }
-
-  private scheduleAmbientFadeOut() {
-    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
-    this.ambientFadeTimer = setTimeout(() => {
-      if (!this.ctx || !this.ambientGain) return
-      this.ambientActive = false
-      const now = this.ctx.currentTime
-      this.ambientGain.gain.cancelScheduledValues(now)
-      this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now)
-      this.ambientGain.gain.linearRampToValueAtTime(0, now + 1.5) // fade out 1.5s
-    }, 2000) // 2 seconds after last keypress
   }
 
   // === #3: Typing intensity model ===
@@ -400,9 +330,6 @@ export class AudioEngine {
     this.updateIntensity()
     // #5: Update adaptive volume
     this.updateAdaptiveVolume()
-    // #4: Ambient noise management
-    this.fadeAmbientIn()
-    this.scheduleAmbientFadeOut()
 
     let buffer: AudioBuffer | null | undefined
 
@@ -514,12 +441,6 @@ export class AudioEngine {
     }
     this.activeVoices = 0
 
-    // Stop ambient
-    if (this.ambientSource) {
-      try { this.ambientSource.stop(); this.ambientSource.disconnect() } catch {}
-      this.ambientSource = null
-    }
-    if (this.ambientFadeTimer) clearTimeout(this.ambientFadeTimer)
     if (this.adaptiveTimer) clearTimeout(this.adaptiveTimer)
     if (this.typingTimeout) clearTimeout(this.typingTimeout)
 
@@ -531,7 +452,6 @@ export class AudioEngine {
 
     this.masterGain = null
     this.compressor = null
-    this.ambientGain = null
     this.pool = []
     this.packs.clear()
     this.keyIntensityMap.clear()
