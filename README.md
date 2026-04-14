@@ -39,16 +39,12 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 ## Four modes
 
-A mode is a coordinated bundle — bed layer, EQ morph, desk reflection, per-key jitter. Switching atomically ramps every parameter at once.
-
 | Mode | Bed | Character |
 |------|-----|-----------|
 | **Thock** · default | — | Heavy low-end, warm decay, satisfying weight on every keystroke |
 | Deep Focus | brown, -38 dB | Muted keys behind a warm bed — disappear into the work |
 | Cozy Writing | pink, -40 dB | Softer keys with pink warmth — long sessions |
 | Classic Mech | — | Full mechanical fidelity, every switch as recorded |
-
-Built for **deep work and focus**. Deep Focus and Cozy Writing lean into non-distracting background sound — the kind that pulls you into the work. Thock goes the other way: thocky, predictable, satisfying with every keystroke. Pick what your current state needs.
 
 &nbsp;
 

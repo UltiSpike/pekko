@@ -37,16 +37,12 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 ## 四种 Mode
 
-每个 Mode 是一组**联动的参数**：底层声、EQ 曲线、桌面反射、逐键抖动。切换时全部参数同时 ramp 到新值，不会听到"半切"的撕裂。
-
 | Mode | 底层声 | 性格 |
 |------|--------|------|
 | **Thock** · 默认 | 无 | 低频厚、暖空间、每一击都有重量感 |
 | Deep Focus | 棕噪声, -38 dB | 按键压暗，声音隐入工作背后 |
 | Cozy Writing | 粉噪声, -40 dB | 温暖粉噪 + 柔和按键，陪伴长时间写作 |
 | Classic Mech | 无 | 全频真实机械键盘还原 |
-
-为 **深度工作与心流** 设计。Deep Focus 和 Cozy Writing 用不抢注意力的背景声把你"拉进"工作里；Thock 走反方向——每一击都给你厚重可预测的满足感。选你此刻需要的那一种。
 
 &nbsp;
 
