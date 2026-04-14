@@ -89,7 +89,13 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 ## 十三种轴体，六套主题
 
-Cherry MX Black · Blue · Brown · Red · NK Cream · Topre Purple · Holy Panda · Buckling Spring · Box Navy · Gateron Red Ink · Blue Alps · Turquoise · Alpaca
+| 类型 | 轴体 |
+|------|------|
+| **线性 (Linear)** | Cherry MX Black (HQ) · Red (HQ) · NK Cream (HQ) · Gateron Red Ink · Black Ink |
+| **段落 (Tactile)** | Cherry MX Brown (HQ) · Topre Purple (HQ) · Holy Panda · Topre |
+| **青轴 (Clicky)** | Cherry MX Blue (HQ) · Blue · Kailh Box Navy · Buckling Spring |
+
+<sub>*(HQ)* = 逐键高保真录音（sprite 或 multi-file 格式）。其他为 5 变体 kbsim 采样包。</sub>
 
 Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 

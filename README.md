@@ -91,7 +91,13 @@ Per-mode morph: low-shelf weight, wet mix, air LPF, per-key jitter. Constant acr
 
 ## Thirteen switches, six themes
 
-Cherry MX Black · Blue · Brown · Red · NK Cream · Topre Purple · Holy Panda · Buckling Spring · Box Navy · Gateron Red Ink · Blue Alps · Turquoise · Alpaca
+| Type | Switches |
+|------|----------|
+| **Linear** | Cherry MX Black (HQ) · Red (HQ) · NK Cream (HQ) · Gateron Red Ink · Black Ink |
+| **Tactile** | Cherry MX Brown (HQ) · Topre Purple (HQ) · Holy Panda · Topre |
+| **Clicky** | Cherry MX Blue (HQ) · Blue · Kailh Box Navy · Buckling Spring |
+
+<sub>*(HQ)* = per-key high-quality recording (sprite or multi-file). Others use 5-variant kbsim packs.</sub>
 
 Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
 

@@ -588,7 +588,34 @@ input[type='range']::-webkit-slider-thumb:active { transform: scale(1.05); }
   transition: color 200ms;
 }
 
-.footer-theme { color: var(--text-muted); }
+.footer-theme {
+  color: var(--text-muted);
+  min-width: 76px;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: color 200ms ease;
+}
+
+.footer-nav-btn {
+  -webkit-app-region: no-drag;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 0;
+  border-radius: 50%;
+  transition: color 120ms, background 120ms;
+}
+.footer-nav-btn:hover {
+  color: var(--text);
+  background: var(--surface-1);
+}
 
 /* ---- Alerts ---- */
 .permission-banner {

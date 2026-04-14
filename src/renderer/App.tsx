@@ -260,11 +260,11 @@ export default function App() {
         <TypingIndicator wpm={wpm} active={typingActive} />
       </div>
 
-      {/* Footer */}
+      {/* Footer — theme switcher */}
       <div className="footer">
+        <button className="footer-nav-btn" onClick={() => cycleTheme(-1)} aria-label="Previous theme">{'\u2039'}</button>
         <span className="footer-theme">{THEMES[themeIndex]?.name}</span>
-        <span>·</span>
-        <span>Q/E</span>
+        <button className="footer-nav-btn" onClick={() => cycleTheme(1)} aria-label="Next theme">{'\u203a'}</button>
       </div>
     </div>
   )
