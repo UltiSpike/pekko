@@ -1,6 +1,125 @@
 export type BedType = 'none' | 'brown' | 'pink'
 export type StyleLevel = 'minimal' | 'soft' | 'full' | 'deep'
 
+// === Per-switch DSP ===
+// Each switch has a curated DSP preset (in profiles/index.json). Users can override
+// 5 of the 7 fields via the Tune panel; bodyPeakHz/Q stay curator-locked because they
+// are voicing decisions, not taste knobs.
+export interface SwitchDsp {
+  bodyPeakHz: number     // 150–800 Hz, curator-only
+  bodyPeakQ: number      // 0.5–4, curator-only
+  bodyPeakDb: number     // 0–6 dB, "thock body" intensity
+  springNotchDb: number  // −12 to +3 dB at 2.5 kHz, suppress / emphasize spring ping
+  transientDb: number    // −6 to +6 dB high-shelf at 5 kHz, attack sharpness
+  topDownBalanceDb: number // −12 to +6 dB, release vs press relative gain
+  decayScale: number     // 0.5–2.0, sample tail length multiplier
+}
+
+// Used when a profile has no `dsp` block — neutral pass-through.
+export const DEFAULT_SWITCH_DSP: SwitchDsp = {
+  bodyPeakHz: 350,
+  bodyPeakQ: 1.5,
+  bodyPeakDb: 0,
+  springNotchDb: 0,
+  transientDb: 0,
+  topDownBalanceDb: 0,
+  decayScale: 1.0,
+}
+
+// User-tunable subset (excludes bodyPeakHz/Q which are curator-locked).
+export type SwitchDspOverride = Partial<Pick<SwitchDsp,
+  'bodyPeakDb' | 'springNotchDb' | 'transientDb' | 'topDownBalanceDb' | 'decayScale'
+>>
+
+export const SWITCH_DSP_RANGE = {
+  bodyPeakDb:       { min: 0,    max: 6,    step: 0.25 },
+  springNotchDb:    { min: -12,  max: 3,    step: 0.5 },
+  transientDb:      { min: -6,   max: 6,    step: 0.25 },
+  topDownBalanceDb: { min: -12,  max: 6,    step: 0.5 },
+  decayScale:       { min: 0.5,  max: 2.0,  step: 0.05 },
+} as const
+
+export function resolveSwitchDsp(preset: SwitchDsp | undefined, override: SwitchDspOverride | undefined): SwitchDsp {
+  return { ...DEFAULT_SWITCH_DSP, ...(preset ?? {}), ...(override ?? {}) }
+}
+
+// === Flavors ===
+// Universal voicing variants applied per-switch. Each transforms the curated preset
+// into an override. "stock" returns {} (= drop override, fall back to preset).
+// Designed so the same names mean the same thing across linear/tactile/clicky.
+export interface Flavor {
+  id: string
+  name: string
+  description: string
+  apply: (preset: SwitchDsp) => SwitchDspOverride
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+
+export const FLAVORS: Flavor[] = [
+  {
+    id: 'stock',
+    name: 'Stock',
+    description: 'As designed',
+    apply: () => ({}),
+  },
+  {
+    id: 'deep',
+    name: 'Deep',
+    description: 'More body, longer tail',
+    apply: (p) => ({
+      bodyPeakDb:       clamp(p.bodyPeakDb + 1.5,       SWITCH_DSP_RANGE.bodyPeakDb.min,       SWITCH_DSP_RANGE.bodyPeakDb.max),
+      transientDb:      clamp(p.transientDb - 1.5,      SWITCH_DSP_RANGE.transientDb.min,      SWITCH_DSP_RANGE.transientDb.max),
+      decayScale:       clamp(p.decayScale + 0.15,      SWITCH_DSP_RANGE.decayScale.min,       SWITCH_DSP_RANGE.decayScale.max),
+      topDownBalanceDb: clamp(p.topDownBalanceDb - 1,   SWITCH_DSP_RANGE.topDownBalanceDb.min, SWITCH_DSP_RANGE.topDownBalanceDb.max),
+    }),
+  },
+  {
+    id: 'bright',
+    name: 'Bright',
+    description: 'Crisp attack, lifted top',
+    apply: (p) => ({
+      bodyPeakDb:       clamp(p.bodyPeakDb - 0.5,       SWITCH_DSP_RANGE.bodyPeakDb.min,       SWITCH_DSP_RANGE.bodyPeakDb.max),
+      transientDb:      clamp(p.transientDb + 2,        SWITCH_DSP_RANGE.transientDb.min,      SWITCH_DSP_RANGE.transientDb.max),
+      springNotchDb:    clamp(p.springNotchDb + 1,      SWITCH_DSP_RANGE.springNotchDb.min,    SWITCH_DSP_RANGE.springNotchDb.max),
+      decayScale:       clamp(p.decayScale - 0.1,       SWITCH_DSP_RANGE.decayScale.min,       SWITCH_DSP_RANGE.decayScale.max),
+      topDownBalanceDb: clamp(p.topDownBalanceDb + 1,   SWITCH_DSP_RANGE.topDownBalanceDb.min, SWITCH_DSP_RANGE.topDownBalanceDb.max),
+    }),
+  },
+  {
+    id: 'smooth',
+    name: 'Smooth',
+    description: 'Polished, no edges',
+    apply: (p) => ({
+      springNotchDb:    clamp(p.springNotchDb - 3,      SWITCH_DSP_RANGE.springNotchDb.min,    SWITCH_DSP_RANGE.springNotchDb.max),
+      transientDb:      clamp(p.transientDb - 0.5,      SWITCH_DSP_RANGE.transientDb.min,      SWITCH_DSP_RANGE.transientDb.max),
+      topDownBalanceDb: clamp(p.topDownBalanceDb - 0.5, SWITCH_DSP_RANGE.topDownBalanceDb.min, SWITCH_DSP_RANGE.topDownBalanceDb.max),
+      decayScale:       clamp(p.decayScale + 0.05,      SWITCH_DSP_RANGE.decayScale.min,       SWITCH_DSP_RANGE.decayScale.max),
+    }),
+  },
+]
+
+// Approximate equality — sliders snap to step values, so 1e-3 tolerance is plenty.
+function overridesEqual(a: SwitchDspOverride, b: SwitchDspOverride): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof SwitchDspOverride>
+  for (const k of keys) {
+    const av = a[k]
+    const bv = b[k]
+    if (av === undefined && bv === undefined) continue
+    if (av === undefined || bv === undefined) return false
+    if (Math.abs(av - bv) > 1e-3) return false
+  }
+  return true
+}
+
+// Returns the matching flavor id, or 'custom' if the override doesn't line up with any.
+export function getCurrentFlavorId(override: SwitchDspOverride, preset: SwitchDsp): string {
+  for (const f of FLAVORS) {
+    if (overridesEqual(override, f.apply(preset))) return f.id
+  }
+  return 'custom'
+}
+
 export interface ModeStyle {
   // Per-key jitter (low = predictable / flow, high = organic / realistic)
   pitchJitter: number    // fraction, e.g. 0.003 = ±0.3%

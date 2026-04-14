@@ -1,5 +1,5 @@
 import { getKeyPan } from '@shared/key-positions'
-import { Mode, ModeStyle, getMode, DEFAULT_MODE_ID } from '@shared/modes'
+import { Mode, ModeStyle, getMode, DEFAULT_MODE_ID, SwitchDsp, DEFAULT_SWITCH_DSP, dbToGain } from '@shared/modes'
 
 interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
 interface MultiPack {
@@ -41,9 +41,17 @@ export class AudioEngine {
   private lowShelf: BiquadFilterNode | null = null
   private wetGain: GainNode | null = null
 
+  // Per-switch DSP nodes — ramped on profile change
+  private bodyPeak: BiquadFilterNode | null = null      // peaking, freq+gain controlled
+  private springNotch: BiquadFilterNode | null = null   // peaking @2.5kHz Q=4, gain controlled
+  private transient: BiquadFilterNode | null = null     // highshelf @5kHz, gain controlled
+
   // Current mode & style — read on every playSound
   private currentMode: Mode = getMode(DEFAULT_MODE_ID)
   private get style(): ModeStyle { return this.currentMode.style }
+
+  // Current switch DSP — applied when profile loads. topDownBalance & decayScale read in playSound.
+  private currentDsp: SwitchDsp = { ...DEFAULT_SWITCH_DSP }
 
   // #5: Adaptive volume decay
   private baseVolume = 1.0         // user-set volume
@@ -121,9 +129,35 @@ export class AudioEngine {
     deskLPF.connect(wetGain)
     wetGain.connect(lowShelf)
 
+    // === Per-switch DSP chain ===
+    // Inserted post-masterGain, pre-(dry+wet split). Default values are neutral
+    // (0 dB) so an unloaded profile sounds identical to before this change.
+    const transient = this.ctx.createBiquadFilter()
+    transient.type = 'highshelf'
+    transient.frequency.value = 5000
+    transient.gain.value = this.currentDsp.transientDb
+    this.transient = transient
+    transient.connect(dryGain)
+    transient.connect(delay)
+
+    const springNotch = this.ctx.createBiquadFilter()
+    springNotch.type = 'peaking'
+    springNotch.frequency.value = 2500
+    springNotch.Q.value = 4
+    springNotch.gain.value = this.currentDsp.springNotchDb
+    this.springNotch = springNotch
+    springNotch.connect(transient)
+
+    const bodyPeak = this.ctx.createBiquadFilter()
+    bodyPeak.type = 'peaking'
+    bodyPeak.frequency.value = this.currentDsp.bodyPeakHz
+    bodyPeak.Q.value = this.currentDsp.bodyPeakQ
+    bodyPeak.gain.value = this.currentDsp.bodyPeakDb
+    this.bodyPeak = bodyPeak
+    bodyPeak.connect(springNotch)
+
     this.masterGain = this.ctx.createGain()
-    this.masterGain.connect(dryGain)
-    this.masterGain.connect(delay)
+    this.masterGain.connect(bodyPeak)
 
     this.initPool()
     this.keepAlive()
@@ -132,6 +166,28 @@ export class AudioEngine {
     const baseMs = ((this.ctx.baseLatency ?? 0) * 1000).toFixed(1)
     const outMs = ((this.ctx.outputLatency ?? 0) * 1000).toFixed(1)
     console.log(`[Audio] init: mode-driven engine · baseLatency=${baseMs}ms outputLatency=${outMs}ms schedOffset=${SCHEDULE_OFFSET * 1000}ms`)
+  }
+
+  // === Per-switch DSP — applies the switch's character (body / spring / transient).
+  // Ramps over 250ms so profile switches don't click. topDown & decay are read live in playSound.
+  applySwitchDsp(dsp: SwitchDsp) {
+    this.currentDsp = dsp
+    if (!this.ctx || !this.bodyPeak || !this.springNotch || !this.transient) return
+    const now = this.ctx.currentTime
+    const rampEnd = now + 0.25
+    const ramp = (p: AudioParam, target: number) => {
+      p.cancelScheduledValues(now)
+      p.setValueAtTime(p.value, now)
+      p.linearRampToValueAtTime(target, rampEnd)
+    }
+    // bodyPeak Hz/Q would zipper if ramped while a voice is mid-flight; setTargetAtTime is smoother.
+    this.bodyPeak.frequency.cancelScheduledValues(now)
+    this.bodyPeak.frequency.setTargetAtTime(dsp.bodyPeakHz, now, 0.05)
+    this.bodyPeak.Q.cancelScheduledValues(now)
+    this.bodyPeak.Q.setTargetAtTime(dsp.bodyPeakQ, now, 0.05)
+    ramp(this.bodyPeak.gain, dsp.bodyPeakDb)
+    ramp(this.springNotch.gain, dsp.springNotchDb)
+    ramp(this.transient.gain, dsp.transientDb)
   }
 
   // === Mode switching — applies style atomically (no bed) ===
@@ -412,12 +468,15 @@ export class AudioEngine {
     const pitchJitter = (Math.random() - 0.5) * this.style.pitchJitter * 2 // symmetric ±
     source.playbackRate.value = pitchBase + keyChar + pitchJitter
 
-    // Volume: intensity × adaptive × ducking × mode-scoped jitter
+    // Volume: intensity × adaptive × ducking × mode-scoped jitter × per-switch top/down balance
     const duckFactor = this.activeVoices > 8 ? 0.8 / Math.sqrt(this.activeVoices - 7) : 1.0
     const intensityVol = 0.5 + volIntensity * 0.5
     const volSpan = this.style.volumeJitter * 2
     const microRandom = (1 - this.style.volumeJitter) + Math.random() * volSpan
-    const finalVol = intensityVol * this.adaptiveMultiplier * duckFactor * microRandom
+    // topDownBalanceDb shapes release relative to press: heavy click bars (Box Navy, Buckling) lift release;
+    // soft Topre / Inks pull release down. Press path is unaffected.
+    const balanceFactor = type === 'up' ? dbToGain(this.currentDsp.topDownBalanceDb) : 1
+    const finalVol = intensityVol * this.adaptiveMultiplier * duckFactor * microRandom * balanceFactor
 
     slot.gain.gain.setValueAtTime(finalVol, playTime)
     slot.panner.pan.setValueAtTime(getKeyPan(keycode), playTime)
@@ -427,7 +486,8 @@ export class AudioEngine {
 
     // Sample offset jitter: 0-2ms varies transient micro-shape
     const offsetJitter = Math.random() * 0.002
-    const dur = Math.min(buffer.duration - offsetJitter, MAX_DUR)
+    // decayScale stretches/shortens the perceived tail. Capped by MAX_DUR for the voice budget.
+    const dur = Math.min((buffer.duration - offsetJitter) * this.currentDsp.decayScale, MAX_DUR)
     const fadeStart = Math.max(0, dur - 0.025)
     slot.gain.gain.setValueAtTime(finalVol, playTime + fadeStart)
     slot.gain.gain.linearRampToValueAtTime(0, playTime + dur)
@@ -501,6 +561,9 @@ export class AudioEngine {
     this.highShelf = null
     this.lowShelf = null
     this.wetGain = null
+    this.bodyPeak = null
+    this.springNotch = null
+    this.transient = null
     this.pool = []
     this.packs.clear()
     this.keyIntensityMap.clear()

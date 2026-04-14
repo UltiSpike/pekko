@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { audioEngine } from '../audio/AudioEngine'
-import type { Mode } from '@shared/modes'
+import type { Mode, SwitchDsp, SwitchDspOverride } from '@shared/modes'
 
 declare global {
   interface Window {
@@ -13,6 +13,7 @@ declare global {
       setTheme: (t: string) => Promise<boolean>
       setMode: (m: string) => Promise<boolean>
       setCustomConfig: (cfg: any) => Promise<boolean>
+      setSwitchDspOverride: (profileId: string, override: SwitchDspOverride) => Promise<boolean>
       getSettings: () => Promise<any>
       getProfiles: () => Promise<any>
       loadSoundPack: (id: string) => Promise<any>
@@ -24,7 +25,7 @@ declare global {
   }
 }
 
-export function useAudioEngine(activeProfileId: string, volume: number, mode: Mode) {
+export function useAudioEngine(activeProfileId: string, volume: number, mode: Mode, switchDsp: SwitchDsp) {
   const [bluetoothWarning, setBluetoothWarning] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [wpm, setWpm] = useState(0)
@@ -85,6 +86,12 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
   useEffect(() => {
     audioEngine.setMode(mode)
   }, [mode])
+
+  // Per-switch DSP — applied whenever the resolved DSP for the active profile changes
+  // (profile switch or user override). Engine ramps internally to avoid clicks.
+  useEffect(() => {
+    audioEngine.applySwitchDsp(switchDsp)
+  }, [switchDsp])
 
   return { bluetoothWarning, soundEnabled, wpm, typingActive }
 }
