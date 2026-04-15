@@ -35,6 +35,7 @@
     "build": "npm run build:renderer && npm run build:main",
     "package": "npm run build && electron-builder",
     "test": "tsx --test \"src/**/*.test.ts\"",
+    "gen:rush-icons": "node scripts/gen-rush-icons.js",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
