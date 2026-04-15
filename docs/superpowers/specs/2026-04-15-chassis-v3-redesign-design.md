@@ -152,14 +152,13 @@ Unchanged (explicit reminder): `← →`, `[ ]`, `T`, `⌘?`, `⇧⌘K`, `⌥⌘
 - `src/renderer/App.tsx` — mount ResizeObserver on root; call `window.api.resize(h)` on debounced change; preserve drawer state when help opens/closes; drop direct `setSize` calls.
 - `src/renderer/components/HelpPanel.tsx` — remove height/overflow constraints; tighten output readout copy.
 - `src/renderer/App.css` — new `.slash-key` styles; delete `.slash-notch`; ensure `.help-panel` has no `max-height` or `overflow`.
-- `src/renderer/components/TopPlate.*` (if extracted) — swap element.
 
 No changes to: audio pipeline, profile system, tune drawer internals, sound-pack loaders, tray, permissions, profile persistence.
 
 ## 6. Success Criteria
 
 1. Opening `/` on any launch fits the entire help panel within the window with zero clipping — verified at min width and at all six finishes.
-2. No file in the renderer contains a literal `480` or `720` for window height after v3.
+2. No file in `src/main` or `src/renderer` contains a literal `480` or `720` used as a window height after v3.
 3. `.slash-key` is discoverable in a 5-second glance test — confirmed by visible border at idle under all six finishes.
 4. Pressing `/` while drawer is open, then `/` again: drawer returns to its previous DSP and scroll state with no flicker.
 5. Pressing `Esc` three times from the most nested state (help + drawer-frozen) closes help, then drawer, then the window.
