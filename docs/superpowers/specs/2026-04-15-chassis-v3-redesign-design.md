@@ -161,7 +161,7 @@ No changes to: audio pipeline, profile system, tune drawer internals, sound-pack
 2. No file in `src/main` or `src/renderer` contains a literal `480` or `720` used as a window height after v3.
 3. `.slash-key` is discoverable in a 5-second glance test — confirmed by visible border at idle under all six finishes.
 4. Pressing `/` while drawer is open, then `/` again: drawer returns to its previous DSP and scroll state with no flicker.
-5. Pressing `Esc` three times from the most nested state (help + drawer-frozen) closes help, then drawer, then the window.
+5. Pressing `Esc` from the most nested state (help open with drawer-frozen) closes help, then closes the drawer on a second press. Esc does NOT hide the window on a third press — window-hide remains bound to `⌥⌘K` and blur, matching v2 behavior despite the v2 doc's claim to the contrary.
 6. Rapidly toggling `/` and `T` (≥ 5 presses/s for 3 s) does not leave the window at a wrong height and does not stutter above 60 fps on reference hardware (M-series MBP).
 7. No scrollbar appears in any state under default finish settings.
 
