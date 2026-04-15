@@ -571,6 +571,40 @@ export class AudioEngine {
 
   resume() { if (this.ctx?.state === 'suspended') this.ctx.resume() }
 
+  // Called by the power-resume IPC after the system wakes / unlocks. Three-
+  // tier fallback: running → no-op; suspended → ctx.resume() with 500ms
+  // verify; closed / resume ineffective → tear down and rebuild the entire
+  // audio graph, restoring profile / mode / dsp from saved state.
+  async wake(): Promise<void> {
+    if (!this.ctx || !this.activeProfile) return  // not initialized yet — boot path will handle it
+
+    const state = this.ctx.state
+    console.log(`[Audio] wake: state=${state}`)
+
+    if (state === 'running') return
+
+    if (state === 'suspended') {
+      try { await this.ctx.resume() } catch (err) { console.warn('[Audio] wake: resume() threw', err) }
+      await new Promise(r => setTimeout(r, 500))
+      if (this.ctx?.state === 'running') {
+        console.log('[Audio] wake: soft recovery ok')
+        return
+      }
+      // fall through → hard rebuild
+    }
+
+    // state === 'closed' | resume() ineffective → hard rebuild
+    const savedProfile = this.activeProfile
+    const savedMode = this.currentMode
+    const savedDsp = this.currentDsp
+    this.destroy()
+    await this.init()
+    await this.loadProfile(savedProfile)
+    this.setMode(savedMode)
+    this.applySwitchDsp(savedDsp)
+    console.log('[Audio] wake: hard rebuild ok')
+  }
+
   // --- Cleanup (prevents memory leaks) ---
   destroy() {
     // Stop all active sources

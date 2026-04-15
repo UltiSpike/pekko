@@ -58,6 +58,14 @@ ipcRenderer.on('hold-repeat-changed', (_e, enabled: boolean) => {
   if (holdRepeatChangedCallback) holdRepeatChangedCallback(enabled)
 })
 
+// Main broadcasts 'power-resume' after sleep/unlock/user-active events so the
+// renderer's AudioEngine can self-heal (resume ctx, or rebuild the audio graph
+// if ctx is closed / unresponsive).
+let powerResumeCallback: (() => void) | null = null
+ipcRenderer.on('power-resume', () => {
+  if (powerResumeCallback) powerResumeCallback()
+})
+
 contextBridge.exposeInMainWorld('api', {
   onKeyEvent: (cb: (keycode: number, type: 'down' | 'up' | 'repeat') => void) => { keyCallback = cb },
   onSoundToggle: (cb: (enabled: boolean) => void) => { soundToggleCallback = cb },
@@ -67,6 +75,7 @@ contextBridge.exposeInMainWorld('api', {
   onBeforeHide:    (cb: () => void) => { beforeHideCallback = cb },
   onUiSoundsChanged: (cb: (enabled: boolean) => void) => { uiSoundsChangedCallback = cb },
   onHoldRepeatChanged: (cb: (enabled: boolean) => void) => { holdRepeatChangedCallback = cb },
+  onPowerResume:   (cb: () => void) => { powerResumeCallback = cb },
   setUiSounds:     (enabled: boolean) => ipcRenderer.invoke('set-ui-sounds', enabled),
   setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
   setIsTuning:     (t: boolean) => ipcRenderer.invoke('set-is-tuning', t),

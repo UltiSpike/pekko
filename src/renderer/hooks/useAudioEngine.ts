@@ -13,6 +13,7 @@ declare global {
       onBeforeHide: (cb: () => void) => void
       onUiSoundsChanged: (cb: (enabled: boolean) => void) => void
       onHoldRepeatChanged: (cb: (enabled: boolean) => void) => void
+      onPowerResume: (cb: () => void) => void
       setUiSounds: (enabled: boolean) => Promise<boolean>
       setHoldRepeat: (enabled: boolean) => Promise<boolean>
       setMode: (m: string) => Promise<boolean>
@@ -64,6 +65,10 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
       audioEngine.setEnabled(enabled)
       setSoundEnabled(enabled)
     })
+
+    // Power wake — system resume / screen unlock / user-active. Engine picks
+    // no-op / resume / rebuild based on ctx.state.
+    window.api.onPowerResume(() => { audioEngine.wake() })
 
     // Output latency probe — informational only. Reported as a silent readout
     // in the help panel (no warn state). v2.5 reverted the warn-level treatment

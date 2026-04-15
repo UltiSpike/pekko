@@ -78,3 +78,36 @@ export function stopKeyboardListener(): void {
     activeKeys.clear()
   } catch (err) { console.error('[Pekko] Stop error:', err) }
 }
+
+// Sleep/wake pair. Unlike stopKeyboardListener, we keep the MessagePort alive
+// so the renderer's port reference stays valid across power cycles — there's
+// no way to re-deliver a port to an existing renderer. On wake, uIOhook is
+// re-started which re-registers the CGEventTap that macOS tears down on sleep.
+export function pauseForSleep(): void {
+  if (!isListening) return
+  try { uIOhook.stop() } catch {}
+  isListening = false
+  activeKeys.clear()  // drop any held keys so we don't leak ghost keyups post-wake
+  console.log('[Pekko] Keyboard paused for sleep')
+}
+
+export function resumeAfterWake(): void {
+  if (isListening) return
+  try {
+    uIOhook.start()
+    isListening = true
+    console.log('[Pekko] Keyboard re-registered after wake')
+  } catch (err) {
+    console.error('[Pekko] Keyboard restart failed, retrying in 1s:', err)
+    setTimeout(() => {
+      if (isListening) return
+      try {
+        uIOhook.start()
+        isListening = true
+        console.log('[Pekko] Keyboard re-registered (retry ok)')
+      } catch (err2) {
+        console.error('[Pekko] Keyboard restart retry failed:', err2)
+      }
+    }, 1000)
+  }
+}

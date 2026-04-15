@@ -1,6 +1,6 @@
-import { app, BrowserWindow, globalShortcut } from 'electron'
+import { app, BrowserWindow, globalShortcut, powerMonitor } from 'electron'
 import path from 'path'
-import { startKeyboardListener, stopKeyboardListener, setHoldRepeat as setKeyboardHoldRepeat } from './keyboard'
+import { startKeyboardListener, stopKeyboardListener, pauseForSleep, resumeAfterWake, setHoldRepeat as setKeyboardHoldRepeat } from './keyboard'
 import { registerIpcHandlers } from './ipc-handlers'
 import { createTray, setSoundEnabled, rebuildTrayMenu } from './tray'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
@@ -52,6 +52,11 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // Tray-only app: window is hidden most of the time, but renderer must
+      // stay responsive for key-event playback and the AudioEngine keepAlive
+      // tick. Disabling background throttling prevents Chromium from clamping
+      // setTimeout and suspending the AudioContext on a hidden window.
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.js')
     }
   })
@@ -139,6 +144,30 @@ app.on('ready', () => {
       mainWindow?.webContents.send('hold-repeat-changed', enabled)
     }
   })
+
+  // === Power lifecycle ===
+  // Why this exists: on long display-sleep / system-sleep cycles macOS tears
+  // down uIOhook's CGEventTap (no key events reach us) and suspends the
+  // AudioContext. Without explicit handling, the app stays silent until
+  // restart. Here we restart uIOhook and notify the renderer to self-heal its
+  // audio graph. 'user-did-become-active' covers the display-sleep-only case
+  // where 'suspend'/'resume' don't fire.
+  const onSleepLike = (label: string) => () => {
+    console.log(`[Pekko] Power: ${label}`)
+    pauseForSleep()
+  }
+  const onWakeLike = (label: string) => () => {
+    console.log(`[Pekko] Power: ${label}`)
+    resumeAfterWake()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('power-resume')
+    }
+  }
+  powerMonitor.on('suspend', onSleepLike('suspend'))
+  powerMonitor.on('lock-screen', onSleepLike('lock-screen'))
+  powerMonitor.on('resume', onWakeLike('resume'))
+  powerMonitor.on('unlock-screen', onWakeLike('unlock-screen'))
+  powerMonitor.on('user-did-become-active', onWakeLike('user-did-become-active'))
 
   // Global: ⇧⌘K mute toggle
   globalShortcut.register('CommandOrControl+Shift+K', () => {
