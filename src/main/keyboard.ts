@@ -1,5 +1,6 @@
 import { BrowserWindow, MessageChannelMain } from 'electron'
 import { uIOhook, UiohookKey } from 'uiohook-napi'
+import { pulseTrayOnce } from './tray'
 
 // uIOhook keycodes for the six "information work" keys that get hold-repeat
 // when the toggle is on. Other keys remain physically realistic (silent on hold).
@@ -47,6 +48,10 @@ export function startKeyboardListener(mainWindow: BrowserWindow, initialHoldRepe
       }
       activeKeys.add(kc)
       keyPort?.postMessage([kc, 1])
+      // Tray keystroke pulse — fires only on fresh keydowns (OS auto-repeat
+      // is handled above and intentionally does NOT pulse, matching audio
+      // engine's "physically realistic" default: one press = one event).
+      pulseTrayOnce()
     })
 
     uIOhook.on('keyup', (event: any) => {

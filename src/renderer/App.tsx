@@ -275,7 +275,8 @@ export default function App() {
   const cycleMode = useCallback((dir: number) => {
     const next = (modeIdx + dir + MODE_IDS.length) % MODE_IDS.length
     handleModeChange(MODE_IDS[next])
-  }, [modeIdx, handleModeChange])
+    flashMeta()
+  }, [modeIdx, handleModeChange, flashMeta])
 
   // Keyboard — ← → switch, [ ] mode, T drawer, / or ⌘? help, Esc close
   useEffect(() => {
@@ -358,12 +359,19 @@ export default function App() {
       )}
 
       {!helpOpen && <>
-      {/* Mode chip */}
-      <div className="mode-block">
-        <button className="mode-nav" onClick={() => cycleMode(-1)} aria-label="Previous mode">{'\u2039'}</button>
-        <div className="mode-chip">{activeMode.name}</div>
-        <button className="mode-nav" onClick={() => cycleMode(1)} aria-label="Next mode">{'\u203a'}</button>
-      </div>
+      {/* Mode kicker — silkscreen label, not a widget */}
+      <button
+        type="button"
+        className={`mode-kicker${metaVisible ? ' revealed' : ''}`}
+        onClick={() => cycleMode(1)}
+        aria-label={`Mode · ${activeMode.name} · click to cycle`}
+      >
+        <span className="mode-kicker-arrow" aria-hidden>{'\u2039'}</span>
+        <span className="mode-kicker-dot"   aria-hidden>·</span>
+        <span className="mode-kicker-name">{activeMode.name}</span>
+        <span className="mode-kicker-dot"   aria-hidden>·</span>
+        <span className="mode-kicker-arrow" aria-hidden>{'\u203a'}</span>
+      </button>
 
       {/* Switch hero */}
       <div className="switch-block">

@@ -340,13 +340,10 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   flex-shrink: 0;
 }
 
-/* ONYX v2.2 — Status LED.
-   Idle = pilot-lit (--led-on @ 35% via --led-dim), always on.
-   Long-cycle 47s opacity drift co-prime with the 6s Filament Breath so the two
-   motions never resync — long-idle states feel in-flux instead of frozen. */
 /* Status LED — pure state indicator (v2.5.1: no click, no tooltip, no button).
-   Shape + color encode state (see StatusLed.tsx). Idle pilot-lit with a 47s
-   slow opacity drift that's co-prime with the 6s mode-chip filament breath. */
+   Shape + color encode state (see StatusLed.tsx). Idle pilot-lit with a 47 s
+   slow opacity drift — sole ambient rhythm on the chassis after the mode-chip
+   filament breath was removed in v2.6 (see mode-silkscreen-design). */
 .status-led {
   width: 6px;
   height: 6px;
@@ -664,64 +661,71 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 }
 
 /* ---- Interaction hygiene ---- */
-.mode-block, .switch-block, .ladder, .fader, .tune-drawer,
+.switch-block, .ladder, .fader, .tune-drawer,
 button, input[type='range'] {
   -webkit-app-region: no-drag;
 }
 
-/* ---- Mode chip ---- */
-.mode-block {
+/* ---- Mode kicker (silkscreen label, demoted from chip v2.5) ---- */
+.mode-kicker {
+  /* button reset */
+  background: none;
+  border: none;
+  font: inherit;
+  margin: 0;
+  /* layout */
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--s-2);
-  padding-top: var(--s-4);
+  gap: 6px;
+  padding: var(--s-4) 0 0;
   flex-shrink: 0;
+  /* reveal */
+  opacity: 0.55;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 200ms ease;
 }
 
-.mode-nav {
-  font-size: 11px;
-  color: var(--ink-2);
-  padding: var(--s-1) var(--s-2);
-  transition: color 120ms ease;
+.mode-kicker.revealed,
+.mode-kicker:hover,
+.mode-kicker:focus-visible {
+  opacity: 1;
+  outline: none;
 }
-.mode-nav:hover { color: var(--ink-1); }
 
-.mode-chip {
-  position: relative;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+.mode-kicker-name {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.36em;
   text-transform: uppercase;
-  color: var(--ink-1);
-  padding: 6px var(--s-3);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r);
-  min-width: 104px;
-  text-align: center;
-  transition: border-color 180ms ease;
-  /* Pocket — engraved into chassis */
-  box-shadow:
-    inset 0  1px 0 var(--engrave-shadow),
-    inset 0 -1px 0 var(--engrave-highlight);
+  color: var(--ink-3);
+  transition: color 150ms ease;
+  /* compensate for trailing letter-spacing on the final char */
+  padding-left: 0.36em;
 }
 
-/* Filament Breath — always-on idle pilot. ::before is a hairline-thin overlay
-   ring whose opacity oscillates 0.22 ↔ 0.30 on a 6 s cycle. One pixel, one axis,
-   one rhythm slower than conscious notice. */
-.mode-chip::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r);
-  opacity: 0.7;
-  pointer-events: none;
-  animation: filament-breath 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+.mode-kicker:hover .mode-kicker-name,
+.mode-kicker:focus-visible .mode-kicker-name {
+  color: var(--ink-2);
 }
-@keyframes filament-breath {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1;    }
+
+.mode-kicker-dot {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.mode-kicker-arrow {
+  font-size: 10px;
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.mode-kicker:hover .mode-kicker-arrow,
+.mode-kicker:focus-visible .mode-kicker-arrow {
+  opacity: 1;
 }
 
 
@@ -731,7 +735,7 @@ button, input[type='range'] {
   flex-direction: column;
   align-items: center;
   gap: var(--s-2);
-  padding-top: var(--s-5);
+  padding-top: var(--s-2);
   padding-bottom: var(--s-5);
   flex-shrink: 0;
 }

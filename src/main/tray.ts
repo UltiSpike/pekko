@@ -11,13 +11,10 @@ export type ArcadeHudState =
 
 const ROOT = path.join(__dirname, '..', '..')
 let tray: Tray | null = null
-let defaultTemplateImg: Electron.NativeImage | null = null
-let rushBaseImg: Electron.NativeImage | null = null
-let rushBrightImg: Electron.NativeImage | null = null
-let rushPerfectImg: Electron.NativeImage | null = null
-let pulseTimer: ReturnType<typeof setInterval> | null = null
-let perfectTimer: ReturnType<typeof setTimeout> | null = null
-let pulseAlt = false
+let idleImg: Electron.NativeImage | null = null         // amber ring, dim (presence)
+let onImg: Electron.NativeImage | null = null           // amber ring + center dot (keystroke)
+let rushPerfectImg: Electron.NativeImage | null = null  // rush-only: 200ms perfect pop
+let revertTimer: ReturnType<typeof setTimeout> | null = null
 let win: BrowserWindow | null = null
 let _soundEnabled = true
 // Gate for pre-measurement race — see index.ts createWindow comment. The tray
@@ -146,76 +143,71 @@ export function setSoundEnabled(enabled: boolean): void {
 }
 
 function createTrayIcon(): Tray {
-  const iconPath = path.join(ROOT, 'assets', 'icons', 'tray-icon.png')
+  const iconsDir = path.join(ROOT, 'assets', 'icons')
   try {
-    const img = nativeImage.createFromPath(iconPath)
-    img.setTemplateImage(true)
-    defaultTemplateImg = img
-    return new Tray(img)
+    // NOT template images — we want the amber color to read as pilot-lamp
+    // glow, not auto-tint to menu-bar black/white. Colored PNGs render
+    // identically in light and dark menu bars.
+    idleImg = nativeImage.createFromPath(path.join(iconsDir, 'tray-icon.png'))
+    try {
+      onImg = nativeImage.createFromPath(path.join(iconsDir, 'tray-icon-on.png'))
+    } catch (err) {
+      console.error('[Pekko] on-state icon load failed:', err)
+    }
+    return new Tray(idleImg)
   } catch {
     return new Tray(nativeImage.createEmpty())
   }
 }
 
 function loadRushIcons(): void {
-  if (rushBaseImg) return
+  if (rushPerfectImg) return
   try {
-    rushBaseImg = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray-rush', 'rush-base.png'))
-    rushBrightImg = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray-rush', 'rush-bright.png'))
     rushPerfectImg = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray-rush', 'rush-perfect.png'))
   } catch (err) {
-    console.error('[Pekko] rush icons load failed:', err)
+    console.error('[Pekko] rush-perfect icon load failed:', err)
   }
 }
 
+// Shared transient-image driver. Sets `img` now, clears any prior pending
+// revert, and schedules a revert to idle after `ms`. Latest caller wins — a
+// keystroke pulse arriving during a PERFECT flash will preempt the flash,
+// which is intentional (keep up with typing > linger on celebration).
+function setTrayTransient(img: Electron.NativeImage, ms: number): void {
+  if (!tray) return
+  tray.setImage(img)
+  if (revertTimer) clearTimeout(revertTimer)
+  revertTimer = setTimeout(() => {
+    revertTimer = null
+    if (tray && idleImg) tray.setImage(idleImg)
+  }, ms)
+}
+
+// Fire once per fresh keydown — tray flips to `on` (ring + dot) for 80 ms,
+// then reverts to idle (ring). Density is capped only by user's keystroke
+// rate, by design. Universal across all modes.
+export function pulseTrayOnce(): void {
+  if (!onImg) return
+  setTrayTransient(onImg, 80)
+}
+
+// Rush mode HUD. The per-keystroke pulse is now universal (not rush-specific),
+// so this function only reacts to PERFECT hits (brief colored pop) and to
+// explicit idle resets. Non-perfect active stages are no-ops — the keystroke
+// pulse owns the tray while typing.
 export function updateArcadeHud(state: ArcadeHudState): void {
   if (!tray) return
   loadRushIcons()
 
   if (state.kind === 'active' && state.perfect && rushPerfectImg) {
-    if (perfectTimer) clearTimeout(perfectTimer)
-    tray.setImage(rushPerfectImg)
-    perfectTimer = setTimeout(() => {
-      applyBaseStage(state)
-    }, 200)
+    setTrayTransient(rushPerfectImg, 200)
     return
   }
 
-  applyBaseStage(state)
-}
-
-function applyBaseStage(state: ArcadeHudState): void {
-  if (!tray) return
-
-  // Any pending PERFECT flash restore is obsolete the moment a new base state
-  // is applied — otherwise a late timeout can restore a stale active icon
-  // after the user has already switched to another mode.
-  if (perfectTimer) { clearTimeout(perfectTimer); perfectTimer = null }
-
-  if (state.kind === 'idle' || !rushBaseImg || !rushBrightImg) {
-    if (pulseTimer) { clearInterval(pulseTimer); pulseTimer = null }
-    if (defaultTemplateImg) tray.setImage(defaultTemplateImg)
-    return
+  if (state.kind === 'idle') {
+    if (revertTimer) { clearTimeout(revertTimer); revertTimer = null }
+    if (idleImg) tray.setImage(idleImg)
   }
-
-  const { stage } = state
-  if (stage === 'engaged' || stage === 'stacking') {
-    if (pulseTimer) { clearInterval(pulseTimer); pulseTimer = null }
-    tray.setImage(stage === 'engaged' ? rushBaseImg : rushBrightImg)
-    return
-  }
-
-  // flow / zone — 2-frame pulse alternation
-  const intervalMs = stage === 'flow' ? 500 : 250  // flow: 2s/cycle, zone: 1s/cycle
-  if (pulseTimer) clearInterval(pulseTimer)
-  pulseAlt = false
-  pulseTimer = setInterval(() => {
-    pulseAlt = !pulseAlt
-    if (tray && rushBaseImg && rushBrightImg) {
-      tray.setImage(pulseAlt ? rushBrightImg : rushBaseImg)
-    }
-  }, intervalMs)
-  tray.setImage(rushBaseImg)
 }
 
 export function createTray(
