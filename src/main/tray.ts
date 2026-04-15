@@ -156,14 +156,10 @@ export function createTray(
     tray.setToolTip('Pekko')
     tray.setContextMenu(buildMenu())
 
-    tray.on('click', () => {
-      if (win?.isVisible()) {
-        win.hide()
-      } else if (canShow()) {
-        win?.show()
-        win?.focus()
-      }
-    })
+    // Left-click on macOS pops the context menu automatically when one is
+    // attached. We intentionally don't override it — the panel is a central
+    // element and shouldn't pop open from an absent-minded tray click. Panel
+    // entry points: ⌥⌘K, menu → Show Window, or the boot-time auto-show.
 
     console.log('[Pekko] Tray created')
     return tray
