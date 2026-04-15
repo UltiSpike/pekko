@@ -12,7 +12,11 @@ export const PERFECT_WINDOW_SIZE = 8        // number of intervals, so need 9 ke
 export const PERFECT_THRESHOLD = 0.15
 export const PERFECT_COOLDOWN_MS = 2000
 
-const STAGE_THRESHOLDS = {
+/**
+ * Combo thresholds for each stage. Exported so overlay / HUD consumers can
+ * reference the same values (single source of truth — see spec §5 table).
+ */
+export const STAGE_THRESHOLDS = {
   engaged: 2,
   stacking: 10,
   flow: 25,
@@ -28,6 +32,11 @@ export function createComboState(): ComboState {
   }
 }
 
+/**
+ * Record a keydown event. `nowMs` is assumed monotonically non-decreasing
+ * (typically `performance.now()`). Out-of-order timestamps will corrupt the
+ * rolling window silently.
+ */
 export function recordKeydown(s: ComboState, nowMs: number): void {
   const interval = s.lastKeydownMs === 0 ? 0 : nowMs - s.lastKeydownMs
   if (interval > COMBO_RESET_INTERVAL_MS) {
