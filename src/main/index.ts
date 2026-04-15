@@ -1,6 +1,6 @@
 import { app, BrowserWindow, globalShortcut } from 'electron'
 import path from 'path'
-import { startKeyboardListener, stopKeyboardListener } from './keyboard'
+import { startKeyboardListener, stopKeyboardListener, setHoldRepeat as setKeyboardHoldRepeat } from './keyboard'
 import { registerIpcHandlers } from './ipc-handlers'
 import { createTray, setSoundEnabled } from './tray'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
@@ -113,7 +113,7 @@ app.on('ready', () => {
         setTimeout(pollPermissionAndStart, 2000)
         return
       }
-      if (startKeyboardListener(mainWindow)) {
+      if (startKeyboardListener(mainWindow, getSettings().holdRepeat)) {
         console.log('[Pekko] Keyboard ready')
       }
     }
@@ -133,6 +133,10 @@ app.on('ready', () => {
     },
     onHelpOpenChange: (open) => {
       isHelpOpen = open
+    },
+    onHoldRepeatChange: (enabled) => {
+      setKeyboardHoldRepeat(enabled)
+      mainWindow?.webContents.send('hold-repeat-changed', enabled)
     }
   })
 

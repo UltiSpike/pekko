@@ -1,13 +1,31 @@
 import { BrowserWindow, MessageChannelMain } from 'electron'
-import { uIOhook } from 'uiohook-napi'
+import { uIOhook, UiohookKey } from 'uiohook-napi'
+
+// uIOhook keycodes for the six "information work" keys that get hold-repeat
+// when the toggle is on. Other keys remain physically realistic (silent on hold).
+const REPEAT_KEYS: ReadonlySet<number> = new Set([
+  UiohookKey.Backspace,
+  UiohookKey.Delete,
+  UiohookKey.ArrowUp,
+  UiohookKey.ArrowDown,
+  UiohookKey.ArrowLeft,
+  UiohookKey.ArrowRight,
+])
+
+let holdRepeatEnabled = false
+
+export function setHoldRepeat(enabled: boolean): void {
+  holdRepeatEnabled = enabled
+}
 
 let isListening = false
 let eventsRegistered = false
 const activeKeys = new Set<number>()
 let keyPort: Electron.MessagePortMain | null = null
 
-export function startKeyboardListener(mainWindow: BrowserWindow): boolean {
+export function startKeyboardListener(mainWindow: BrowserWindow, initialHoldRepeat: boolean): boolean {
   if (isListening) return true
+  holdRepeatEnabled = initialHoldRepeat
 
   // Create MessagePort (renderer needs this even before listener starts)
   if (!keyPort) {
@@ -20,9 +38,15 @@ export function startKeyboardListener(mainWindow: BrowserWindow): boolean {
   // Register uIOhook events only once — they persist across start/stop
   if (!eventsRegistered) {
     uIOhook.on('keydown', (event: any) => {
-      if (activeKeys.has(event.keycode)) return
-      activeKeys.add(event.keycode)
-      keyPort?.postMessage([event.keycode, 1])
+      const kc = event.keycode
+      if (activeKeys.has(kc)) {
+        // OS auto-repeat. Drop unless this key is whitelisted AND toggle is on.
+        if (!holdRepeatEnabled || !REPEAT_KEYS.has(kc)) return
+        keyPort?.postMessage([kc, 2])
+        return
+      }
+      activeKeys.add(kc)
+      keyPort?.postMessage([kc, 1])
     })
 
     uIOhook.on('keyup', (event: any) => {
