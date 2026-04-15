@@ -28,6 +28,7 @@ export default function VolumeSlider({ volume, onChange }: Props) {
           style={{ '--fill': `${pct}%` } as React.CSSProperties}
           onChange={(e) => onChange(parseInt(e.target.value) / 100)}
           aria-label="Volume"
+          aria-valuetext={`${pct} percent`}
         />
       </div>
       <span className="fader-value">{pct}</span>

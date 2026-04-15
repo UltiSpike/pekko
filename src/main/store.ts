@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { AppSettings, Finish } from '../shared/types'
+import { AppSettings, Finish, FINISH_MIGRATION } from '../shared/types'
 import {
   DEFAULT_MODE_ID,
   DEFAULT_CUSTOM_STYLE,
@@ -19,6 +19,7 @@ const defaults: AppSettings = {
   mode: DEFAULT_MODE_ID,
   isTuning: false,
   finish: 'auto',
+  uiSounds: false,
   customBed: DEFAULT_CUSTOM_BED,
   customBedGainDb: DEFAULT_CUSTOM_BED_GAIN_DB,
   customStyle: { ...DEFAULT_CUSTOM_STYLE },
@@ -34,9 +35,17 @@ function getStorePath(): string {
 // adding fields to ModeStyle / SwitchDspOverride later doesn't strand old users
 // with `undefined` for the new fields.
 function mergeSettings(stored: Partial<AppSettings>): AppSettings {
+  // ONYX migration: v1 finish names → v2 material names.
+  // Stored value is `string` at the JSON layer; cast intentionally for the lookup.
+  const storedFinish = stored.finish as string | undefined
+  const finish: Finish | undefined = storedFinish && FINISH_MIGRATION[storedFinish]
+    ? FINISH_MIGRATION[storedFinish]
+    : (stored.finish as Finish | undefined)
+
   return {
     ...defaults,
     ...stored,
+    finish: finish ?? defaults.finish,
     customStyle: { ...defaults.customStyle, ...(stored.customStyle ?? {}) },
     switchDspOverrides: { ...defaults.switchDspOverrides, ...(stored.switchDspOverrides ?? {}) },
   }
@@ -101,9 +110,35 @@ export function setIsTuning(isTuning: boolean): void {
   writeStore(s)
 }
 
+// ONYX v2.2 — write a close timestamp so the next open can detect "stale" state.
+// Used by the isTuning guard: if the user closes with the drawer open and reopens
+// hours later, we don't surprise them with a tune session restored from limbo.
+export function recordClose(): void {
+  const s = readStore()
+  s.lastCloseAt = Date.now()
+  writeStore(s)
+}
+
+// On read, if last close > 1 hour ago, force-clear the drawer state.
+export function getSettingsWithStaleGuard(): AppSettings {
+  const s = readStore()
+  const STALE_MS = 60 * 60 * 1000   // 1 hour
+  if (s.isTuning && s.lastCloseAt && Date.now() - s.lastCloseAt > STALE_MS) {
+    s.isTuning = false
+    writeStore(s)
+  }
+  return s
+}
+
 export function setFinish(finish: Finish): void {
   const s = readStore()
   s.finish = finish
+  writeStore(s)
+}
+
+export function setUiSounds(enabled: boolean): void {
+  const s = readStore()
+  s.uiSounds = enabled
   writeStore(s)
 }
 

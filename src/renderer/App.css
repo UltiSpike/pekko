@@ -13,129 +13,152 @@
   --s-5: 24px;
   --s-6: 32px;
   --s-7: 48px;
-  --overlay-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+
+  /* Single noise SVG, used at per-material opacity. Per-material grain (stone /
+     paper / copper / cloth) can specialise later by varying baseFrequency. */
+  --noise-url: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+  --noise-opacity: 0.04;
 }
 
 /* =============================================
-   Finishes — chassis/LED/accent committed pairings.
+   Materials — chassis / LED / interactive committed pairings.
    Picked via [data-finish="..."] on <html>.
-   'auto' (or absent) = system light/dark → Ivory / Graphite.
+   'auto' (or absent) = system light/dark → Bone / Basalt.
+
+   Token roles (decoupled in v2.1):
+     LED tokens (--led-*)       → engine-driven indicators only
+     Interactive tokens         → buttons, focus, tab underline
+     Engraving tokens           → debossed text edges
    ============================================= */
 
-/* --- Graphite (default dark) — studio console, Nagra/Bricasti --- */
+/* --- Basalt (default dark) — warm matte stone, Nagra / Bricasti --- */
 :root,
 :root[data-finish='auto'],
-:root[data-finish='graphite'] {
-  --chassis: rgba(20, 19, 15, 0.80);
-  --overlay: rgba(24, 22, 18, 0.96);
+:root[data-finish='basalt'] {
+  --chassis: rgba(20, 19, 15, 0.82);
+  --chassis-tint: #0E0D0B;
   --ink-1: #EAE3D2;
   --ink-2: #9A9187;
-  --ink-3: #5E584F;
   --hairline: rgba(255, 255, 255, 0.10);
+  --engrave-shadow: rgba(0, 0, 0, 0.45);
+  --engrave-highlight: rgba(255, 240, 220, 0.06);
   --led-on: #FFB347;
-  --led-dim: rgba(255, 179, 71, 0.14);
+  --led-dim: rgba(255, 179, 71, 0.35);
   --led-mute: #7A3529;
   --led-peak: #FF8547;
-  --accent: #FFB347;
-  --accent-soft: rgba(255, 179, 71, 0.12);
+  --interactive: #E59F40;
+  --interactive-soft: rgba(229, 159, 64, 0.14);
+  --focus-ring: #E59F40;
 }
 
-/* --- Ivory (auto on light system) — paper notebook, Muji/Midori --- */
+/* --- Bone (auto on light system) — warm paper, Muji / Crane --- */
 @media (prefers-color-scheme: light) {
   :root:not([data-finish]),
   :root[data-finish='auto'] {
-    --chassis: rgba(246, 242, 234, 0.72);
-    --overlay: rgba(250, 246, 240, 0.96);
+    --chassis: rgba(246, 242, 234, 0.74);
+    --chassis-tint: #ECE7DD;
     --ink-1: #1A1815;
     --ink-2: #5A544D;
-    --ink-3: #938C84;
     --hairline: rgba(0, 0, 0, 0.10);
+    --engrave-shadow: rgba(50, 40, 30, 0.28);
+    --engrave-highlight: transparent;
     --led-on: #C0392B;
-    --led-dim: rgba(192, 57, 43, 0.18);
+    --led-dim: rgba(192, 57, 43, 0.30);
     --led-mute: #8A5C4E;
     --led-peak: #D8503F;
-    --accent: #A82E21;
-    --accent-soft: rgba(192, 57, 43, 0.10);
+    --interactive: #A82E21;
+    --interactive-soft: rgba(168, 46, 33, 0.12);
+    --focus-ring: #A82E21;
   }
 }
 
-:root[data-finish='ivory'] {
-  --chassis: rgba(246, 242, 234, 0.72);
-  --overlay: rgba(250, 246, 240, 0.96);
+:root[data-finish='bone'] {
+  --chassis: rgba(246, 242, 234, 0.74);
+  --chassis-tint: #ECE7DD;
   --ink-1: #1A1815;
   --ink-2: #5A544D;
-  --ink-3: #938C84;
   --hairline: rgba(0, 0, 0, 0.10);
+  --engrave-shadow: rgba(50, 40, 30, 0.28);
+  --engrave-highlight: transparent;
   --led-on: #C0392B;
-  --led-dim: rgba(192, 57, 43, 0.18);
+  --led-dim: rgba(192, 57, 43, 0.30);
   --led-mute: #8A5C4E;
   --led-peak: #D8503F;
-  --accent: #A82E21;
-  --accent-soft: rgba(192, 57, 43, 0.10);
+  --interactive: #A82E21;
+  --interactive-soft: rgba(168, 46, 33, 0.12);
+  --focus-ring: #A82E21;
 }
 
-/* --- Phosphor (dark) — Tektronix CRT --- */
-:root[data-finish='phosphor'] {
-  --chassis: rgba(10, 16, 12, 0.85);
-  --overlay: rgba(14, 20, 16, 0.97);
+/* --- Verdigris (dark) — oxidised copper, antique brass --- */
+:root[data-finish='verdigris'] {
+  --chassis: rgba(10, 16, 12, 0.86);
+  --chassis-tint: #060904;
   --ink-1: #CFE8D4;
-  --ink-2: #6B8872;
-  --ink-3: #3A4D40;
+  --ink-2: #7C9A84;
   --hairline: rgba(78, 190, 107, 0.15);
+  --engrave-shadow: rgba(0, 10, 8, 0.42);
+  --engrave-highlight: rgba(180, 230, 190, 0.08);
   --led-on: #4EBE6B;
-  --led-dim: rgba(78, 190, 107, 0.14);
+  --led-dim: rgba(78, 190, 107, 0.30);
   --led-mute: #1A3A22;
   --led-peak: #72D880;
-  --accent: #4EBE6B;
-  --accent-soft: rgba(78, 190, 107, 0.12);
+  --interactive: #46A85F;
+  --interactive-soft: rgba(70, 168, 95, 0.14);
+  --focus-ring: #46A85F;
 }
 
-/* --- Cyan (dark cool) — OP-1, Walkman Pro --- */
-:root[data-finish='cyan'] {
-  --chassis: rgba(22, 26, 30, 0.82);
-  --overlay: rgba(26, 30, 34, 0.97);
+/* --- Patina (dark cool) — weathered teal metal, OP-1 / Walkman Pro --- */
+:root[data-finish='patina'] {
+  --chassis: rgba(22, 26, 30, 0.84);
+  --chassis-tint: #121519;
   --ink-1: #DCE6EA;
   --ink-2: #8A96A0;
-  --ink-3: #505860;
   --hairline: rgba(255, 255, 255, 0.10);
+  --engrave-shadow: rgba(0, 10, 15, 0.45);
+  --engrave-highlight: rgba(200, 230, 230, 0.07);
   --led-on: #5FB8A8;
-  --led-dim: rgba(95, 184, 168, 0.14);
+  --led-dim: rgba(95, 184, 168, 0.30);
   --led-mute: #2C4D48;
   --led-peak: #78D4C2;
-  --accent: #5FB8A8;
-  --accent-soft: rgba(95, 184, 168, 0.12);
+  --interactive: #56A697;
+  --interactive-soft: rgba(86, 166, 151, 0.14);
+  --focus-ring: #56A697;
 }
 
-/* --- Ember (dark warm) — McIntosh tube, vintage radio --- */
-:root[data-finish='ember'] {
-  --chassis: rgba(28, 17, 13, 0.82);
-  --overlay: rgba(32, 20, 16, 0.97);
+/* --- Shellac (dark warm) — deep red-brown lacquer, McIntosh / vintage radio --- */
+:root[data-finish='shellac'] {
+  --chassis: rgba(28, 17, 13, 0.84);
+  --chassis-tint: #160D0A;
   --ink-1: #F0DCC6;
-  --ink-2: #A08274;
-  --ink-3: #5E4A40;
+  --ink-2: #B09284;
   --hairline: rgba(255, 170, 110, 0.10);
+  --engrave-shadow: rgba(15, 5, 0, 0.45);
+  --engrave-highlight: rgba(255, 220, 180, 0.08);
   --led-on: #E04B2C;
-  --led-dim: rgba(224, 75, 44, 0.14);
+  --led-dim: rgba(224, 75, 44, 0.30);
   --led-mute: #5A2616;
   --led-peak: #F4674A;
-  --accent: #E04B2C;
-  --accent-soft: rgba(224, 75, 44, 0.12);
+  --interactive: #C84327;
+  --interactive-soft: rgba(200, 67, 39, 0.14);
+  --focus-ring: #C84327;
 }
 
-/* --- Slate (light cool) — blueprint, Rams drafting paper --- */
-:root[data-finish='slate'] {
-  --chassis: rgba(220, 226, 236, 0.72);
-  --overlay: rgba(226, 232, 242, 0.96);
+/* --- Indigo Linen (light cool) — engineering blueprint, Rams drafting paper --- */
+:root[data-finish='indigo-linen'] {
+  --chassis: rgba(220, 226, 236, 0.74);
+  --chassis-tint: #C9D1DD;
   --ink-1: #1A2436;
   --ink-2: #4A5A76;
-  --ink-3: #8090A8;
   --hairline: rgba(59, 74, 107, 0.15);
+  --engrave-shadow: rgba(30, 50, 80, 0.25);
+  --engrave-highlight: transparent;
   --led-on: #3B4A6B;
-  --led-dim: rgba(59, 74, 107, 0.20);
-  --led-mute: #7B8698;
+  --led-dim: rgba(59, 74, 107, 0.35);
+  --led-mute: #5A6478;
   --led-peak: #5268A0;
-  --accent: #3B4A6B;
-  --accent-soft: rgba(59, 74, 107, 0.10);
+  --interactive: #354260;
+  --interactive-soft: rgba(53, 66, 96, 0.14);
+  --focus-ring: #354260;
 }
 
 *, *::before, *::after {
@@ -151,8 +174,60 @@ button {
   padding: 0;
 }
 
+/* ONYX v2.2 — Focus visible. 1px accent outline + 2px offset. Matches the
+   instrument metaphor (panel marking the active control), no glow. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r);
+}
+.finish-btn:focus-visible,
+.finish-auto:focus-visible,
+.preset-chip:focus-visible,
+.bed-chip:focus-visible,
+.tune-button:focus-visible,
+.drawer-btn:focus-visible,
+.help-button:focus-visible,
+.drawer-tab:focus-visible {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight),
+    inset 0 0 0 1px var(--focus-ring);
+}
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--chassis), 0 0 0 3px var(--focus-ring);
+}
+@media (forced-colors: active) {
+  :focus-visible { outline: 2px solid CanvasText; }
+}
+
+/* Reduced motion — kill blinks / scale pulses / drawer transforms. Keep only
+   opacity transitions, compressed to ≤80ms. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 80ms !important;
+  }
+  .status-led.warn { outline: 1px solid var(--led-on); }
+  .app.warming { animation: warmup-fade-reduced 160ms ease forwards; }
+  .app.shutting { animation: shutdown-fade-reduced 80ms ease forwards; }
+  .help-panel, .tune-drawer { animation: none; }
+  .switch-name.swap-blackout { opacity: 0.6; }
+}
+@keyframes warmup-fade-reduced {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes shutdown-fade-reduced {
+  from { opacity: 1; } to { opacity: 0; }
+}
+
 /* ---- Root chassis ---- */
 .app {
+  position: relative;
   width: 100%;
   height: 100vh;
   background: var(--chassis);
@@ -169,6 +244,80 @@ button {
   overflow: hidden;
 }
 
+/* ONYX v2 — Warmup. 920ms total. Chassis ink fades in 0→180; hairlines settle
+   220→920 (we just let them appear with opacity); Status LED runs its own
+   inhale via .status-led animation chained from .app.warming. Suppressed on
+   first launch until permission resolves (see App.tsx). */
+.app.warming {
+  animation: warmup-fade 920ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes warmup-fade {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* Shutdown — 400ms mirror. Played before window hides on blur. */
+.app.shutting {
+  animation: shutdown-fade 400ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes shutdown-fade {
+  0%   { opacity: 1; }
+  60%  { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+/* Material noise overlay — single texture, per-material grain comes through chassis tint */
+.app::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--noise-url);
+  mix-blend-mode: overlay;
+  opacity: var(--noise-opacity);
+  pointer-events: none;
+  z-index: 0;
+}
+.app > * { position: relative; z-index: 1; }
+
+/* =============================================
+   Engraving recipe — letter interior = chassis;
+   shadow + highlight pair fakes the cut edge.
+   12 px floor (smaller text uses solid --ink-* fill).
+   ============================================= */
+
+/* Pocket — pressed INTO material (state chips, mode chip, drawer chips) */
+.engraved-pocket {
+  border: 1px solid var(--hairline);
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+
+/* Boss — raised PROUD of material (primary action: TUNE, Done) */
+.engraved-boss {
+  border: 1px solid var(--hairline);
+  box-shadow:
+    inset 0 -1px 0 var(--engrave-shadow),    /* shadow on bottom edge */
+    inset 0  1px 0 var(--engrave-highlight); /* highlight on top edge */
+}
+
+/* Engraved label — vertical lighting (legibility at small sizes) */
+.engraved-label {
+  color: var(--chassis-tint);
+  text-shadow:
+    0  1px 0 var(--engrave-highlight),
+    0 -1px 0 var(--engrave-shadow);
+}
+
+/* Engraved hero — diagonal lighting (more dimensional at 28px) */
+.engraved-hero {
+  color: var(--chassis-tint);
+  text-shadow:
+    -1px -1px 0 var(--engrave-shadow),
+     1px  1px 0 var(--engrave-highlight);
+}
+
 /* ---- Top plate ---- */
 .top-plate {
   height: 32px;
@@ -179,6 +328,10 @@ button {
   flex-shrink: 0;
 }
 
+/* ONYX v2.2 — Status LED.
+   Idle = pilot-lit (--led-on @ 35% via --led-dim), always on.
+   Long-cycle 47s opacity drift co-prime with the 6s Filament Breath so the two
+   motions never resync — long-idle states feel in-flux instead of frozen. */
 .status-led {
   width: 6px;
   height: 6px;
@@ -186,24 +339,47 @@ button {
   background: var(--led-dim);
   -webkit-app-region: no-drag;
   cursor: pointer;
-  transition: background 180ms ease, box-shadow 180ms ease;
+  transition: background 180ms ease, width 180ms ease, height 180ms ease;
   position: relative;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--chassis);
+  /* Idle pilot drift — opacity 0.85 ↔ 1.0 on a 47s cycle.
+     Co-prime with mode-chip filament breath (6s) — combined rhythm unpredictable. */
+  animation: pilot-drift 47s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
 .status-led.active {
   background: var(--led-on);
-  box-shadow: 0 0 6px var(--led-on);
-  animation: led-pulse 200ms ease-out;
+  animation: led-pulse 200ms ease-out, pilot-drift 47s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  /* No bloom — LEDs on real instruments don't shine THROUGH the chassis. */
 }
 
 .status-led.muted {
-  background: var(--led-mute);
+  background: transparent;
+  border: 1.5px solid var(--led-mute);
   animation: led-breathe 3s ease-in-out infinite;
 }
 
 .status-led.warn {
+  width: 12px;
+  height: 12px;
   background: var(--led-mute);
-  animation: led-blink 1s steps(2) infinite;
+  color: var(--chassis-tint);
+  animation: none; /* Static — no blink (seizure-adjacent) */
+}
+.status-led.warn::after {
+  content: '!';
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
 }
 
 @keyframes led-pulse {
@@ -212,12 +388,12 @@ button {
   100% { transform: scale(1); }
 }
 @keyframes led-breathe {
-  0%, 100% { opacity: 0.35; }
+  0%, 100% { opacity: 0.40; }
   50%      { opacity: 0.85; }
 }
-@keyframes led-blink {
-  0%, 49%   { opacity: 1; }
-  50%, 100% { opacity: 0.2; }
+@keyframes pilot-drift {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1.00; }
 }
 
 .status-tooltip {
@@ -225,16 +401,13 @@ button {
   top: 16px;
   right: 0;
   min-width: 200px;
-  background: var(--overlay);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: var(--chassis);
   border: 1px solid var(--hairline);
   border-radius: var(--r);
   padding: var(--s-3);
   font-size: 11px;
   color: var(--ink-2);
   line-height: 1.45;
-  box-shadow: var(--overlay-shadow);
   z-index: 20;
 }
 
@@ -244,7 +417,7 @@ button {
   font-weight: 700;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--interactive);
   cursor: pointer;
 }
 
@@ -257,32 +430,38 @@ button {
   -webkit-app-region: no-drag;
 }
 
+/* HELP — engraved function key, matches the TUNE / Done family.
+   Pocket treatment (pressed-in) at idle; lights up like a chip when active. */
 .help-button {
-  width: 18px;
   height: 18px;
-  border-radius: 50%;
+  padding: 0 var(--s-2);
+  border-radius: var(--r);
   border: 1px solid var(--hairline);
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-family: var(--font);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 0;
   transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
 }
 .help-button:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--interactive);
+  border-color: var(--interactive);
 }
 .help-button.on {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
 }
 
 .help-panel {
@@ -292,12 +471,9 @@ button {
   width: 300px;
   max-height: calc(100vh - 80px);
   overflow-y: auto;
-  background: var(--overlay);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  background: var(--chassis);
   border: 1px solid var(--hairline);
   border-radius: var(--r);
-  box-shadow: var(--overlay-shadow);
   padding: var(--s-4);
   display: flex;
   flex-direction: column;
@@ -316,7 +492,7 @@ button {
   font-weight: 700;
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
   margin-bottom: var(--s-2);
 }
 
@@ -364,12 +540,35 @@ button {
   cursor: pointer;
   transition: color 120ms, border-color 120ms, background 120ms;
   margin-bottom: var(--s-2);
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+.finish-auto-sub {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: none;
+  color: var(--ink-2);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.finish-group-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.65;
+  margin: var(--s-3) 0 var(--s-2);
 }
 .finish-auto:hover { color: var(--ink-1); }
 .finish-auto.on {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
 }
 
 .finish-grid {
@@ -391,12 +590,15 @@ button {
   background: transparent;
   cursor: pointer;
   transition: color 120ms, border-color 120ms, background 120ms;
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
 }
 .finish-btn:hover { color: var(--ink-1); }
 .finish-btn.on {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
 }
 
 /* ---- Interaction hygiene ---- */
@@ -417,24 +619,47 @@ button, input[type='range'] {
 
 .mode-nav {
   font-size: 11px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   padding: var(--s-1) var(--s-2);
   transition: color 120ms ease;
 }
 .mode-nav:hover { color: var(--ink-1); }
 
 .mode-chip {
+  position: relative;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-1);
-  padding: 5px var(--s-3);
+  padding: 6px var(--s-3);
   border: 1px solid var(--hairline);
   border-radius: var(--r);
-  min-width: 120px;
+  min-width: 104px;
   text-align: center;
   transition: border-color 180ms ease;
+  /* Pocket — engraved into chassis */
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+
+/* Filament Breath — always-on idle pilot. ::before is a hairline-thin overlay
+   ring whose opacity oscillates 0.22 ↔ 0.30 on a 6 s cycle. One pixel, one axis,
+   one rhythm slower than conscious notice. */
+.mode-chip::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  opacity: 0.7;
+  pointer-events: none;
+  animation: filament-breath 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes filament-breath {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1;    }
 }
 
 
@@ -450,16 +675,21 @@ button, input[type='range'] {
 }
 
 .switch-name {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 500;
-  letter-spacing: 2px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--ink-1);
   text-align: center;
   line-height: 1.15;
-  transition: transform 40ms ease-out;
+  transition: opacity 100ms ease;
+  /* Engraved hero — letter interior = chassis-tint, edges catch light */
+  color: var(--chassis-tint);
+  text-shadow:
+    -1px -1px 0 var(--engrave-shadow),
+     1px  1px 0 var(--engrave-highlight);
 }
-.switch-name.pulse { transform: scale(1.008); }
+/* Used by finish-swap: opacity 1→0→1 around 320ms cross-dissolve */
+.switch-name.swap-blackout { opacity: 0; }
 
 .switch-nav-row {
   display: flex;
@@ -471,7 +701,7 @@ button, input[type='range'] {
 
 .switch-nav {
   font-size: 16px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   padding: var(--s-1) var(--s-2);
   transition: color 120ms ease;
 }
@@ -496,13 +726,73 @@ button, input[type='range'] {
   line-height: 1.45;
 }
 
+/* ONYX v2.2 — inline warn panel replaces .switch-desc when needsPermission /
+   bluetoothWarning is true. Surfaces the problem at the centroid of the UI
+   instead of behind a hover tooltip on the 6 px Status LED. */
+.warn-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: 1px solid var(--led-mute);
+  border-radius: var(--r);
+  max-width: 280px;
+  margin-top: var(--s-2);
+  text-align: left;
+}
+.warn-panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--led-mute);
+}
+.warn-panel-body {
+  font-size: 11px;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+.warn-panel-action {
+  align-self: flex-start;
+  margin-top: var(--s-1);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-1);
+  background: transparent;
+  border: 1px solid var(--led-mute);
+  border-radius: var(--r);
+  padding: 5px var(--s-3);
+  cursor: pointer;
+  transition: color 120ms, background 120ms, border-color 120ms;
+}
+.warn-panel-action:hover {
+  background: var(--led-mute);
+  color: var(--chassis);
+}
+
 /* ---- Hairline divider ---- */
 .rule {
   height: 1px;
   background: var(--hairline);
   border: none;
-  margin: 0;
+  margin: var(--s-4) 0 0;    /* gap-before s-4 */
   flex-shrink: 0;
+}
+/* When rule sits between fader and TUNE, soften it to 50% so TUNE feels
+   *connected* to the control block above, not isolated as its own footer. */
+.rule.soft { opacity: 0.5; }
+
+/* ---- DSP Warmth Arc ---- */
+.warmth-arc {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 
 /* ---- LED intensity ladder ---- */
@@ -510,26 +800,30 @@ button, input[type='range'] {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: var(--s-4) 0 var(--s-3);
+  padding: var(--s-4) 0 0;   /* gap-before s-4; gap-after via fader pad-top */
   flex-shrink: 0;
+  height: 20px;              /* committed v2.2 — exact rhythm */
 }
 
+/* v2.1 hierarchy fix: segments default to ink-2 ghosted at rest;
+   --led-on only on currently-firing segments. Ladder no longer competes
+   with the engraved switch hero for visual weight. */
 .ladder-seg {
   flex: 1;
   height: 12px;
-  background: var(--led-dim);
+  background: var(--ink-2);
+  opacity: 0.18;
   border-radius: 1px;
-  transition: background 160ms ease;
+  transition: background 160ms ease, opacity 160ms ease;
 }
 
-.ladder-seg.on  { background: var(--led-on); }
-.ladder-seg.peak { background: var(--led-peak); }
+.ladder-seg.on   { background: var(--led-on); opacity: 1; }
+.ladder-seg.tail { background: var(--led-dim); opacity: 1; }
+.ladder-seg.peak { background: var(--led-peak); opacity: 1; }
 
-.ladder.muted .ladder-seg,
-.ladder.muted .ladder-seg.on,
-.ladder.muted .ladder-seg.peak {
+.ladder.muted .ladder-seg {
   background: var(--led-mute);
-  opacity: 0.4;
+  opacity: 0.40;
 }
 
 /* ---- Volume fader ---- */
@@ -537,7 +831,7 @@ button, input[type='range'] {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: var(--s-2) 0 var(--s-4);
+  padding: var(--s-3) 0 0;   /* gap-before s-3; gap-after via rule margin-top */
   flex-shrink: 0;
 }
 
@@ -564,8 +858,8 @@ button, input[type='range'] {
   width: 100%;
   height: 2px;
   background: linear-gradient(to right,
-    var(--accent) 0%,
-    var(--accent) var(--fill, 70%),
+    var(--interactive) 0%,
+    var(--interactive) var(--fill, 70%),
     var(--hairline) var(--fill, 70%),
     var(--hairline) 100%);
   border: none;
@@ -620,15 +914,17 @@ button, input[type='range'] {
 .tune-button-row {
   display: flex;
   justify-content: center;
-  padding: var(--s-4) 0 var(--s-2);
+  padding: var(--s-3) 0 0;   /* gap-before s-3 */
   flex-shrink: 0;
 }
 
+/* TUNE — primary action. Raised BOSS (inverted engraving: shadow on bottom,
+   highlight on top — proud of surface). Distinguishes ACTION from STATE chips. */
 .tune-button {
   font-family: var(--font);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 3px;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--ink-1);
   padding: 10px var(--s-6);
@@ -637,12 +933,16 @@ button, input[type='range'] {
   border-radius: var(--r);
   cursor: pointer;
   transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+  /* Boss — light from above hits the top edge */
+  box-shadow:
+    inset 0 -1px 0 var(--engrave-shadow),
+    inset 0  1px 0 var(--engrave-highlight);
 }
-.tune-button:hover { border-color: var(--accent); color: var(--accent); }
+.tune-button:hover { border-color: var(--interactive); color: var(--interactive); }
 .tune-button.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
+  color: var(--interactive);
 }
 
 /* ---- Tune drawer ---- */
@@ -652,12 +952,17 @@ button, input[type='range'] {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  animation: drawer-in 220ms cubic-bezier(0.32, 0.72, 0.24, 1);
+  /* ONYX v2.2 — drawer body stays inert during the 460ms open animation so
+     a fast click can't land on a slider rail mid-flight. pointer-events is
+     animatable as a discrete property — flips at 99% to 'auto'. */
+  pointer-events: none;
+  animation: drawer-in 460ms cubic-bezier(0.32, 0.72, 0.24, 1) forwards;
 }
 
 @keyframes drawer-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  0%   { opacity: 0; transform: translateY(-6px); pointer-events: none; }
+  99%  { pointer-events: none; }
+  100% { opacity: 1; transform: translateY(0); pointer-events: auto; }
 }
 
 .drawer-header {
@@ -675,7 +980,7 @@ button, input[type='range'] {
   font-weight: 600;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .drawer-tabs {
@@ -697,6 +1002,17 @@ button, input[type='range'] {
 .drawer-tab.on {
   color: var(--ink-1);
   border-bottom-color: var(--led-on);
+}
+/* Subtitle under active tab — disambiguates Switch/Mode terms */
+.drawer-tab-sub {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.65;
+  text-align: right;
+  padding: 2px 0 var(--s-2);
 }
 
 .drawer-body {
@@ -728,11 +1044,19 @@ button, input[type='range'] {
   border: 1px solid var(--hairline);
   border-radius: var(--r);
   transition: color 120ms, border-color 120ms;
+  /* Default Reset = pocket */
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
 }
-.drawer-btn:hover { color: var(--ink-1); border-color: var(--accent); }
+.drawer-btn:hover { color: var(--ink-1); border-color: var(--interactive); }
 .drawer-btn.primary {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--interactive);
+  border-color: var(--interactive);
+  /* Done = boss (raised, like TUNE) */
+  box-shadow:
+    inset 0 -1px 0 var(--engrave-shadow),
+    inset 0  1px 0 var(--engrave-highlight);
 }
 
 /* ---- Preset chips (SWITCH tab) ---- */
@@ -753,12 +1077,16 @@ button, input[type='range'] {
   border: 1px solid var(--hairline);
   border-radius: var(--r);
   transition: color 120ms, border-color 120ms, background 120ms;
+  /* Pocket — state chip pressed into chassis */
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
 }
 .preset-chip:hover { color: var(--ink-1); }
 .preset-chip.on {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
 }
 
 /* ---- Slider rows ---- */
@@ -784,8 +1112,8 @@ button, input[type='range'] {
   width: 100%;
   height: 2px;
   background: linear-gradient(to right,
-    var(--accent) 0%,
-    var(--accent) var(--fill, 50%),
+    var(--interactive) 0%,
+    var(--interactive) var(--fill, 50%),
     var(--hairline) var(--fill, 50%),
     var(--hairline) 100%);
   border-radius: 1px;
@@ -825,16 +1153,19 @@ button, input[type='range'] {
   border: 1px solid var(--hairline);
   border-radius: var(--r);
   transition: color 120ms, border-color 120ms;
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
 }
 .bed-chip:hover { color: var(--ink-1); }
 .bed-chip.on {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--interactive);
+  border-color: var(--interactive);
 }
 
 .mode-hint {
   font-size: 11px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   padding: var(--s-3);
   border: 1px dashed var(--hairline);
   border-radius: var(--r);
@@ -848,13 +1179,15 @@ button, input[type='range'] {
   gap: var(--s-3);
   padding: var(--s-2) 0 var(--s-3);
 }
-.drawer-compact-row .ladder { padding: 0; flex: 1; }
-.drawer-compact-row .fader { padding: 0; flex: 1; }
+/* Refactoring-ui §A4: rebalance — fader needs more room than ladder when paired,
+   because the VOL label + value chrome eats ~80px before the track starts. */
+.drawer-compact-row .ladder { padding: 0; flex: 3; }
+.drawer-compact-row .fader  { padding: 0; flex: 4; }
 
 /* ---- Loading state ---- */
 .loading {
   font-size: 11px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-align: center;
   padding: var(--s-5);
 }

@@ -102,10 +102,24 @@ export default function TuneView({
     <div className="tune-drawer">
       <div className="drawer-header">
         <span className="drawer-title">Tune</span>
-        <div className="drawer-tabs" role="tablist">
+        <div
+          className="drawer-tabs"
+          role="tablist"
+          aria-label="Tune sections"
+          onKeyDown={(e) => {
+            // Arrow keys cycle tabs when focus is on a tab — App's ←/→ profile
+            // listener defers to us because the active element matches [role="tab"].
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+              e.preventDefault()
+              setTab(tab === 'switch' ? 'mode' : 'switch')
+            }
+          }}
+        >
           <button
             role="tab"
+            tabIndex={tab === 'switch' ? 0 : -1}
             aria-selected={tab === 'switch'}
+            aria-controls="tune-tabpanel"
             className={`drawer-tab${tab === 'switch' ? ' on' : ''}`}
             onClick={() => setTab('switch')}
           >
@@ -113,7 +127,9 @@ export default function TuneView({
           </button>
           <button
             role="tab"
+            tabIndex={tab === 'mode' ? 0 : -1}
             aria-selected={tab === 'mode'}
+            aria-controls="tune-tabpanel"
             className={`drawer-tab${tab === 'mode' ? ' on' : ''}`}
             onClick={() => setTab('mode')}
           >
@@ -121,8 +137,11 @@ export default function TuneView({
           </button>
         </div>
       </div>
+      <div className="drawer-tab-sub" aria-hidden="true">
+        {tab === 'switch' ? 'Sample + DSP' : 'Soundscape'}
+      </div>
 
-      <div className="drawer-body">
+      <div className="drawer-body" id="tune-tabpanel" role="tabpanel">
         {tab === 'switch' ? (
           <>
             <div className="preset-chips">

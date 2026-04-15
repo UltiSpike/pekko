@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, setCustomConfig, setSwitchDspOverride } from './store'
+import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, setUiSounds, setCustomConfig, setSwitchDspOverride } from './store'
 import type { BedType, ModeStyle, SwitchDspOverride } from '../shared/modes'
 import type { Finish } from '../shared/types'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
@@ -140,6 +140,7 @@ export function registerIpcHandlers(hooks: Hooks = {}): void {
   ipcMain.handle('set-mode', (_event, m: string) => { setMode(m); return true })
   ipcMain.handle('set-is-tuning', (_event, t: boolean) => { setIsTuning(t); hooks.onTuningChange?.(t); return true })
   ipcMain.handle('set-finish', (_event, f: Finish) => { setFinish(f); rebuildTrayMenu(); return true })
+  ipcMain.handle('set-ui-sounds', (_event, enabled: boolean) => { setUiSounds(enabled); rebuildTrayMenu(); return true })
   ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle }) => {
     setCustomConfig(cfg)
     return true

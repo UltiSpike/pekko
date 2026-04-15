@@ -4,7 +4,11 @@ import { startKeyboardListener, stopKeyboardListener } from './keyboard'
 import { registerIpcHandlers } from './ipc-handlers'
 import { createTray, setSoundEnabled } from './tray'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
-import { getSettings } from './store'
+import { getSettings, getSettingsWithStaleGuard, recordClose } from './store'
+
+// Shutdown choreography — renderer plays a 400ms fade before main hides the
+// window. Slightly over the animation duration to let the keyframe finish.
+const SHUTDOWN_MS = 420
 
 const ROOT = path.join(__dirname, '..', '..')
 
@@ -21,7 +25,8 @@ function isDev() {
 
 function createWindow() {
   const iconPath = path.join(ROOT, 'assets', 'icons', 'app-icon.icns')
-  const initialHeight = getSettings().isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED
+  // ONYX v2.2 stale guard: if last close > 1 hour ago, isTuning is force-cleared.
+  const initialHeight = getSettingsWithStaleGuard().isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED
 
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
@@ -57,10 +62,18 @@ function createWindow() {
 
   // Hide on blur — popover behavior. Suspended while the tune drawer is open
   // so a misclick can't destroy the user's mid-tune context.
+  // ONYX v2.2 — emit 'before-hide' so renderer can play 400ms shutdown fade
+  // before the window actually disappears.
   mainWindow.on('blur', () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (getSettings().isTuning) return
-    mainWindow.hide()
+    recordClose()
+    mainWindow.webContents.send('before-hide')
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
+        mainWindow.hide()
+      }
+    }, SHUTDOWN_MS)
   })
 }
 

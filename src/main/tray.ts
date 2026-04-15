@@ -1,7 +1,7 @@
 import { BrowserWindow, Menu, Tray, app, nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { getSettings, setProfile, setVolume, setFinish } from './store'
+import { getSettings, setProfile, setVolume, setFinish, setUiSounds } from './store'
 import { Profile, FINISHES, Finish } from '../shared/types'
 
 const ROOT = path.join(__dirname, '..', '..')
@@ -69,6 +69,16 @@ function buildMenu(): Menu {
     { label: 'Switch', submenu: profileItems },
     { label: `Volume · ${volPct}%`, submenu: volumeItems },
     { label: `Finish · ${activeFinishName}`, submenu: finishItems },
+    {
+      label: 'UI Sounds',
+      type: 'checkbox' as const,
+      checked: settings.uiSounds,
+      click: () => {
+        setUiSounds(!settings.uiSounds)
+        win?.webContents.send('ui-sounds-changed', !settings.uiSounds)
+        rebuildTrayMenu()
+      },
+    },
     { type: 'separator' },
     {
       label: _soundEnabled ? 'Sound On' : 'Muted',

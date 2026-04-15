@@ -39,12 +39,27 @@ ipcRenderer.on('finish-changed', (_e, finish: string) => {
   if (finishChangedCallback) finishChangedCallback(finish)
 })
 
+// ONYX v2.2 — main signals 'about to hide window' so renderer can play the
+// shutdown fade animation in the ~400ms grace before window.hide() fires.
+let beforeHideCallback: (() => void) | null = null
+ipcRenderer.on('before-hide', () => {
+  if (beforeHideCallback) beforeHideCallback()
+})
+
+let uiSoundsChangedCallback: ((enabled: boolean) => void) | null = null
+ipcRenderer.on('ui-sounds-changed', (_e, enabled: boolean) => {
+  if (uiSoundsChangedCallback) uiSoundsChangedCallback(enabled)
+})
+
 contextBridge.exposeInMainWorld('api', {
   onKeyEvent: (cb: (keycode: number, type: string) => void) => { keyCallback = cb },
   onSoundToggle: (cb: (enabled: boolean) => void) => { soundToggleCallback = cb },
   onProfileChanged: (cb: (id: string) => void) => { profileChangedCallback = cb },
   onVolumeChanged: (cb: (v: number) => void) => { volumeChangedCallback = cb },
   onFinishChanged: (cb: (finish: string) => void) => { finishChangedCallback = cb },
+  onBeforeHide:    (cb: () => void) => { beforeHideCallback = cb },
+  onUiSoundsChanged: (cb: (enabled: boolean) => void) => { uiSoundsChangedCallback = cb },
+  setUiSounds:     (enabled: boolean) => ipcRenderer.invoke('set-ui-sounds', enabled),
   setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
   setIsTuning:     (t: boolean) => ipcRenderer.invoke('set-is-tuning', t),
   setFinish:       (f: string)  => ipcRenderer.invoke('set-finish', f),

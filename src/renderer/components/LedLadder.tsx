@@ -10,7 +10,9 @@ const SEGMENTS = 24
 const PEAK_START = 21      // top 3 segments = peak zone
 const PEAK_THRESHOLD_WPM = 90
 
-// Ladder visualizes live typing intensity. See docs/design/CHASSIS.md §4.
+// ONYX v2.1 — Ladder visualizes typing intensity. Demoted from v1's always-accent
+// to ink-2 ghosted at rest; --led-on only on currently-firing segments; --led-dim
+// on the trailing tail. Brightness encodes engine activity, not decoration.
 export default function LedLadder({ wpm, active, muted }: Props) {
   const [level, setLevel] = useState(0)
   const lastActiveRef = useRef<number>(0)
@@ -42,14 +44,19 @@ export default function LedLadder({ wpm, active, muted }: Props) {
   return (
     <div className={`ladder ${muted ? 'muted' : ''}`} aria-hidden="true">
       {Array.from({ length: SEGMENTS }).map((_, i) => {
-        const on = i < level
-        const peak = on && peakActive && i >= PEAK_START
-        return (
-          <span
-            key={i}
-            className={`ladder-seg ${on ? 'on' : ''} ${peak ? 'peak' : ''}`}
-          />
-        )
+        const lit = i < level
+        const peak = lit && peakActive && i >= PEAK_START
+        // Currently-firing edge (most-recently-lit segment) = bright on
+        // Trailing segments below it = dim tail
+        // Future segments = ghost (default style)
+        const cls = peak
+          ? 'peak'
+          : lit && i === level - 1
+            ? 'on'        // leading edge — brightest
+            : lit
+              ? 'tail'    // trailing — --led-dim
+              : ''        // ghost (default ink-2 @ 0.18)
+        return <span key={i} className={`ladder-seg ${cls}`} />
       })}
     </div>
   )
