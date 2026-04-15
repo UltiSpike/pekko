@@ -413,10 +413,47 @@ export class AudioEngine {
   }
 
   // === Playback (all optimizations converge here) ===
-  playSound(keycode: number, type: 'down' | 'up'): void {
+  playSound(keycode: number, type: 'down' | 'up' | 'repeat'): void {
     if (!this._enabled || !this.ctx || !this.masterGain) return
     const pack = this.packs.get(this.activeProfile)
     if (!pack) return
+
+    // Repeat path: OS auto-repeat for whitelisted keys (⌫ ⌦ ← → ↑ ↓). Plays
+    // the down sound at fixed intensity 0.50 — deterministic "metronome tick"
+    // that bypasses interval-based intensity, per-key history, WPM, jitter,
+    // and per-switch top/down balance. Adaptive volume still applies so a
+    // sustained hold gets quieter alongside other typing, and spatial pan is
+    // preserved so arrow keys still land on their side.
+    if (type === 'repeat') {
+      let buffer: AudioBuffer | null | undefined
+      if (pack.type === 'sprite') {
+        buffer = pack.keys.get(keycode)?.down ?? pack.fallbackDown
+      } else {
+        const special = SPECIAL_KEYS[keycode]
+        buffer = (special && pack.data.press.special[special]) || this.pickVariant(pack.data.press.generic)
+      }
+      if (!buffer) return
+      const now = this.ctx.currentTime
+      const playTime = now + SCHEDULE_OFFSET
+      const slot = this.acquireSlot()
+      const source = this.ctx.createBufferSource()
+      source.buffer = buffer
+      source.playbackRate.value = 1.0
+      const intensityVol = 0.5 + 0.50 * 0.5 // fixed intensity 0.50 → 0.75
+      const finalVol = intensityVol * this.adaptiveMultiplier
+      slot.gain.gain.setValueAtTime(finalVol, playTime)
+      slot.panner.pan.setValueAtTime(getKeyPan(keycode), playTime)
+      source.connect(slot.gain)
+      slot.source = source
+      const dur = Math.min(buffer.duration * this.currentDsp.decayScale, MAX_DUR)
+      const fadeStart = Math.max(0, dur - 0.025)
+      slot.gain.gain.setValueAtTime(finalVol, playTime + fadeStart)
+      slot.gain.gain.linearRampToValueAtTime(0, playTime + dur)
+      source.start(playTime)
+      source.stop(playTime + dur)
+      source.onended = () => this.releaseSlot(slot)
+      return
+    }
 
     // WPM tracking (keydown only)
     if (type === 'down') this.updateWpm()

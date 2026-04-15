@@ -5,7 +5,7 @@ import type { Mode, SwitchDsp, SwitchDspOverride } from '@shared/modes'
 declare global {
   interface Window {
     api: {
-      onKeyEvent: (cb: (keycode: number, type: string) => void) => void
+      onKeyEvent: (cb: (keycode: number, type: 'down' | 'up' | 'repeat') => void) => void
       onSoundToggle: (cb: (enabled: boolean) => void) => void
       onProfileChanged: (cb: (id: string) => void) => void
       onVolumeChanged: (cb: (v: number) => void) => void
@@ -53,7 +53,7 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
     if (!window.api) return
     window.api.onKeyEvent((keycode, type) => {
       audioEngine.resume()
-      audioEngine.playSound(keycode, type as 'down' | 'up')
+      audioEngine.playSound(keycode, type)
       pollWpm()
     })
 
