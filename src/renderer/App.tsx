@@ -311,12 +311,12 @@ export default function App() {
               own shortcut by rotating to vertical when help is open. Tune has
               no visible hint — T keyboard only (discoverable via help panel). */}
           <button
-            className={`slash-notch${helpOpen ? ' on' : ''}`}
+            className={`slash-key${helpOpen ? ' on' : ''}`}
             onClick={() => setHelpOpen((o) => !o)}
-            aria-label="Shortcuts and finish"
+            aria-label="Shortcuts"
             aria-expanded={helpOpen}
-            title="Shortcuts and finish (/)"
-          />
+            title="Shortcuts · /"
+          >/</button>
           <StatusLed
             active={typingActive && soundEnabled}
             muted={!soundEnabled}
