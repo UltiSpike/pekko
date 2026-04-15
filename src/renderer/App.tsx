@@ -207,25 +207,25 @@ export default function App() {
     if (hasApi) await window.api.setHoldRepeat(next)
   }, [])
 
-  const persistCustom = useCallback(async (bed: BedType, bedGainDb: number, style: ModeStyle) => {
+  const persistCustom = useCallback(async (bed: BedType, bedGainDb: number, style: ModeStyle, arcadeEnabled: boolean) => {
     if (!hasApi) return
-    await window.api.setCustomConfig({ bed, bedGainDb, style })
+    await window.api.setCustomConfig({ bed, bedGainDb, style, arcadeEnabled })
   }, [])
 
   const handleCustomStyleChange = useCallback((style: ModeStyle) => {
     setCustomStyle(style)
-    persistCustom(customBed, customBedGainDb, style)
-  }, [customBed, customBedGainDb, persistCustom])
+    persistCustom(customBed, customBedGainDb, style, customArcadeEnabled)
+  }, [customBed, customBedGainDb, customArcadeEnabled, persistCustom])
 
   const handleCustomBedChange = useCallback((bed: BedType) => {
     setCustomBed(bed)
-    persistCustom(bed, customBedGainDb, customStyle)
-  }, [customBedGainDb, customStyle, persistCustom])
+    persistCustom(bed, customBedGainDb, customStyle, customArcadeEnabled)
+  }, [customBedGainDb, customStyle, customArcadeEnabled, persistCustom])
 
   const handleCustomBedGainChange = useCallback((db: number) => {
     setCustomBedGainDb(db)
-    persistCustom(customBed, db, customStyle)
-  }, [customBed, customStyle, persistCustom])
+    persistCustom(customBed, db, customStyle, customArcadeEnabled)
+  }, [customBed, customStyle, customArcadeEnabled, persistCustom])
 
   const resetCustom = useCallback(() => {
     const bed = DEFAULT_CUSTOM_BED
@@ -234,8 +234,8 @@ export default function App() {
     setCustomBed(bed)
     setCustomBedGainDb(gain)
     setCustomStyle(style)
-    persistCustom(bed, gain, style)
-  }, [persistCustom])
+    persistCustom(bed, gain, style, customArcadeEnabled)
+  }, [customArcadeEnabled, persistCustom])
 
   const handleSwitchDspChange = useCallback((override: SwitchDspOverride) => {
     setSwitchDspOverrides((prev) => ({ ...prev, [activeProfile]: override }))
