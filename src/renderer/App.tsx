@@ -298,6 +298,15 @@ export default function App() {
       <div className="top-plate">
         <div className="help-wrap">
           <button
+            className={`help-button${isTuning ? ' on' : ''}`}
+            onClick={() => handleTuningChange(!isTuning)}
+            aria-label={isTuning ? 'Close tune drawer' : 'Open tune drawer'}
+            aria-expanded={isTuning}
+            title={isTuning ? 'Close tune (T)' : 'Tune (T)'}
+          >
+            Tune
+          </button>
+          <button
             className={`help-button${helpOpen ? ' on' : ''}`}
             onClick={() => setHelpOpen((o) => !o)}
             aria-label="Shortcuts and finish"
@@ -382,15 +391,6 @@ export default function App() {
           <DspWarmthArc wpm={wpm} active={typingActive} muted={!soundEnabled} />
           <LedLadder wpm={wpm} active={typingActive} muted={!soundEnabled} />
           <VolumeSlider volume={volume} onChange={handleVolumeChange} />
-          <hr className="rule soft" />
-          <div className="tune-button-row">
-            <button
-              className={`tune-button ${isTuning ? 'active' : ''}`}
-              onClick={() => handleTuningChange(true)}
-            >
-              Tune
-            </button>
-          </div>
         </>
       )}
 

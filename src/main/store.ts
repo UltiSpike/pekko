@@ -18,7 +18,7 @@ const defaults: AppSettings = {
   startAtLogin: false,
   mode: DEFAULT_MODE_ID,
   isTuning: false,
-  finish: 'auto',
+  finish: 'indigo-linen',
   uiSounds: false,
   customBed: DEFAULT_CUSTOM_BED,
   customBedGainDb: DEFAULT_CUSTOM_BED_GAIN_DB,

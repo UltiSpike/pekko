@@ -13,10 +13,15 @@ const SHUTDOWN_MS = 420
 const ROOT = path.join(__dirname, '..', '..')
 
 const WINDOW_WIDTH = 360
-const WINDOW_WIDTH_MIN = 340
-const WINDOW_WIDTH_MAX = 440
+const WINDOW_WIDTH_MIN = 320
+const WINDOW_WIDTH_MAX = 520
 const WINDOW_HEIGHT_CLOSED = 480
 const WINDOW_HEIGHT_OPEN = 720
+// Free-resize bounds — user can drag both axes.
+// Drawer toggle still jumps to the default closed/open heights; user can
+// resize on top from there.
+const WINDOW_HEIGHT_MIN = 400
+const WINDOW_HEIGHT_MAX = 900
 
 let mainWindow: BrowserWindow | null = null
 let soundEnabled = true
@@ -35,9 +40,8 @@ function createWindow() {
     height: initialHeight,
     minWidth: WINDOW_WIDTH_MIN,
     maxWidth: WINDOW_WIDTH_MAX,
-    // Height is pinned to drawer state — user can resize width only.
-    minHeight: initialHeight,
-    maxHeight: initialHeight,
+    minHeight: WINDOW_HEIGHT_MIN,
+    maxHeight: WINDOW_HEIGHT_MAX,
     show: true,
     resizable: true,
     titleBarStyle: 'hiddenInset',
@@ -88,9 +92,6 @@ function setWindowTuning(isTuning: boolean): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
   const targetHeight = isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED
   const [w] = mainWindow.getSize()
-  // Unlock height temporarily so setSize isn't clamped by the previous min/max.
-  mainWindow.setMaximumSize(WINDOW_WIDTH_MAX, targetHeight)
-  mainWindow.setMinimumSize(WINDOW_WIDTH_MIN, targetHeight)
   mainWindow.setSize(w, targetHeight, true)
 }
 
