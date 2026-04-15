@@ -97,6 +97,8 @@ function loadSoundPack(profileId: string): { config: any; spriteData?: Uint8Arra
 
 type Hooks = {
   onTuningChange?: (isTuning: boolean) => void
+  onResize?: (height: number) => void
+  onHelpOpenChange?: (open: boolean) => void
 }
 
 export function registerIpcHandlers(hooks: Hooks = {}): void {
@@ -151,4 +153,13 @@ export function registerIpcHandlers(hooks: Hooks = {}): void {
   })
   ipcMain.handle('check-permissions', () => checkAccessibilityPermission())
   ipcMain.handle('request-permissions', () => { requestAccessibilityPermission(); return true })
+  ipcMain.handle('resize-window', (_event, h: number) => {
+    if (typeof h !== 'number' || !Number.isFinite(h)) return false
+    hooks.onResize?.(h)
+    return true
+  })
+  ipcMain.handle('set-help-open', (_event, open: boolean) => {
+    hooks.onHelpOpenChange?.(!!open)
+    return true
+  })
 }
