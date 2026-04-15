@@ -1,7 +1,8 @@
 import { BrowserWindow, Menu, Tray, app, nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { getSettings, setProfile, setVolume, setFinish, setUiSounds } from './store'
+import { getSettings, setProfile, setVolume, setFinish, setUiSounds, setHoldRepeat } from './store'
+import { setHoldRepeat as setKeyboardHoldRepeat } from './keyboard'
 import { Profile, FINISHES, Finish } from '../shared/types'
 
 const ROOT = path.join(__dirname, '..', '..')
@@ -93,6 +94,21 @@ function buildMenu(): Menu {
         _soundEnabled = !_soundEnabled
         win?.webContents.send('sound-toggle', _soundEnabled)
         rebuildTrayMenu()
+      },
+    },
+    {
+      label: 'Hold-Repeat Clicks',
+      type: 'checkbox' as const,
+      accelerator: 'CommandOrControl+Shift+R',
+      checked: getSettings().holdRepeat,
+      click: () => {
+        const next = !getSettings().holdRepeat
+        setHoldRepeat(next)
+        setKeyboardHoldRepeat(next)
+        rebuildTrayMenu()
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('hold-repeat-changed', next)
+        }
       },
     },
     { type: 'separator' },
