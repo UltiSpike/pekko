@@ -20,6 +20,7 @@ const defaults: AppSettings = {
   isTuning: false,
   finish: 'indigo-linen',
   uiSounds: false,
+  holdRepeat: false,
   customBed: DEFAULT_CUSTOM_BED,
   customBedGainDb: DEFAULT_CUSTOM_BED_GAIN_DB,
   customStyle: { ...DEFAULT_CUSTOM_STYLE },
@@ -46,6 +47,7 @@ function mergeSettings(stored: Partial<AppSettings>): AppSettings {
     ...defaults,
     ...stored,
     finish: finish ?? defaults.finish,
+    holdRepeat: typeof stored.holdRepeat === 'boolean' ? stored.holdRepeat : defaults.holdRepeat,
     customStyle: { ...defaults.customStyle, ...(stored.customStyle ?? {}) },
     switchDspOverrides: { ...defaults.switchDspOverrides, ...(stored.switchDspOverrides ?? {}) },
   }
@@ -139,6 +141,12 @@ export function setFinish(finish: Finish): void {
 export function setUiSounds(enabled: boolean): void {
   const s = readStore()
   s.uiSounds = enabled
+  writeStore(s)
+}
+
+export function setHoldRepeat(enabled: boolean): void {
+  const s = getSettings()
+  s.holdRepeat = enabled
   writeStore(s)
 }
 

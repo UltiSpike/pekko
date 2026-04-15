@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 // Key event callback — wired via MessagePort for lowest latency
-let keyCallback: ((keycode: number, type: string) => void) | null = null
+let keyCallback: ((keycode: number, type: 'down' | 'up' | 'repeat') => void) | null = null
 
 // Receive the MessagePort from main process (one-time setup)
 ipcRenderer.on('key-port', (event) => {
@@ -10,7 +10,9 @@ ipcRenderer.on('key-port', (event) => {
     const d = e.data
     if (!Array.isArray(d) || d.length !== 2 || typeof d[0] !== 'number' || typeof d[1] !== 'number') return
     const [keycode, flag] = d
-    if (keyCallback) keyCallback(keycode, flag === 1 ? 'down' : 'up')
+    if (!keyCallback) return
+    const type = flag === 1 ? 'down' : flag === 2 ? 'repeat' : 'up'
+    keyCallback(keycode, type)
   }
   port.start()
 })
@@ -51,14 +53,20 @@ ipcRenderer.on('ui-sounds-changed', (_e, enabled: boolean) => {
   if (uiSoundsChangedCallback) uiSoundsChangedCallback(enabled)
 })
 
+let holdRepeatChangedCallback: ((enabled: boolean) => void) | null = null
+ipcRenderer.on('hold-repeat-changed', (_e, enabled: boolean) => {
+  if (holdRepeatChangedCallback) holdRepeatChangedCallback(enabled)
+})
+
 contextBridge.exposeInMainWorld('api', {
-  onKeyEvent: (cb: (keycode: number, type: string) => void) => { keyCallback = cb },
+  onKeyEvent: (cb: (keycode: number, type: 'down' | 'up' | 'repeat') => void) => { keyCallback = cb },
   onSoundToggle: (cb: (enabled: boolean) => void) => { soundToggleCallback = cb },
   onProfileChanged: (cb: (id: string) => void) => { profileChangedCallback = cb },
   onVolumeChanged: (cb: (v: number) => void) => { volumeChangedCallback = cb },
   onFinishChanged: (cb: (finish: string) => void) => { finishChangedCallback = cb },
   onBeforeHide:    (cb: () => void) => { beforeHideCallback = cb },
   onUiSoundsChanged: (cb: (enabled: boolean) => void) => { uiSoundsChangedCallback = cb },
+  onHoldRepeatChanged: (cb: (enabled: boolean) => void) => { holdRepeatChangedCallback = cb },
   setUiSounds:     (enabled: boolean) => ipcRenderer.invoke('set-ui-sounds', enabled),
   setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
   setIsTuning:     (t: boolean) => ipcRenderer.invoke('set-is-tuning', t),
@@ -68,6 +76,7 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('set-switch-dsp-override', { profileId, override }),
   resizeWindow:    (h: number)  => ipcRenderer.invoke('resize-window', h),
   setHelpOpen:     (open: boolean) => ipcRenderer.invoke('set-help-open', open),
+  setHoldRepeat:   (enabled: boolean) => ipcRenderer.invoke('set-hold-repeat', enabled),
   getSettings:       ()            => ipcRenderer.invoke('get-settings'),
   getProfiles:       ()            => ipcRenderer.invoke('get-profiles'),
   loadSoundPack:     (id: string)  => ipcRenderer.invoke('load-sound-pack', id),

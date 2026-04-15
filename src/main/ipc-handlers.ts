@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, setUiSounds, setCustomConfig, setSwitchDspOverride } from './store'
+import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, setUiSounds, setCustomConfig, setSwitchDspOverride, setHoldRepeat } from './store'
 import type { BedType, ModeStyle, SwitchDspOverride } from '../shared/modes'
 import type { Finish } from '../shared/types'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
@@ -99,6 +99,7 @@ type Hooks = {
   onTuningChange?: (isTuning: boolean) => void
   onResize?: (height: number) => void
   onHelpOpenChange?: (open: boolean) => void
+  onHoldRepeatChange?: (enabled: boolean) => void
 }
 
 export function registerIpcHandlers(hooks: Hooks = {}): void {
@@ -160,6 +161,13 @@ export function registerIpcHandlers(hooks: Hooks = {}): void {
   })
   ipcMain.handle('set-help-open', (_event, open: boolean) => {
     hooks.onHelpOpenChange?.(!!open)
+    return true
+  })
+  ipcMain.handle('set-hold-repeat', (_event, enabled: boolean) => {
+    const v = !!enabled
+    setHoldRepeat(v)
+    rebuildTrayMenu()
+    hooks.onHoldRepeatChange?.(v)
     return true
   })
 }

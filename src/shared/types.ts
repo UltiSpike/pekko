@@ -46,6 +46,9 @@ export interface AppSettings {
   // Opt-in UI sound cues for drawer open/close + mute toggle. Default off —
   // a menu-bar tool shouldn't make sound of its own without permission.
   uiSounds: boolean
+  // Opt-in: when true, OS auto-repeat for ⌫ ⌦ ←→↑↓ produces click sounds.
+  // All other keys remain physically realistic (silent on hold).
+  holdRepeat: boolean
   // Timestamp (ms epoch) of the last window close. Used by the v2.2 isTuning
   // stale guard — if reopen happens > 1 hour later, drawer state is cleared.
   lastCloseAt?: number
@@ -59,5 +62,5 @@ export interface AppSettings {
 
 export interface KeyEvent {
   keycode: number
-  type: 'down' | 'up'
+  type: 'down' | 'up' | 'repeat'
 }
