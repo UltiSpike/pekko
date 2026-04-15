@@ -350,7 +350,7 @@ export default function App() {
           <div className="loading">Loading</div>
         ) : activeData ? (
           <>
-            <div className={`switch-name${heroBlackout ? ' swap-blackout' : ''}`}>{activeData.name}</div>
+            <div className={`switch-name${heroBlackout ? ' swap-blackout' : ''}`}>{activeData.name.replace(/\s*\([^)]*\)\s*$/, '')}</div>
             <div className="switch-nav-row">
               <button className="switch-nav" onClick={() => cycleProfile(-1)} aria-label="Previous switch (left arrow key)" title="Previous switch (←)">{'\u2039'}</button>
               <div className={`switch-meta ${metaVisible ? 'visible' : ''}`}>
