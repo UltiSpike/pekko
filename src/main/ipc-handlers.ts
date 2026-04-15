@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { getSettings, setProfile, setVolume, setTheme, setMode, setCustomConfig, setSwitchDspOverride } from './store'
+import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, setCustomConfig, setSwitchDspOverride } from './store'
 import type { BedType, ModeStyle, SwitchDspOverride } from '../shared/modes'
+import type { Finish } from '../shared/types'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
 import { rebuildTrayMenu } from './tray'
 
@@ -94,7 +95,11 @@ function loadSoundPack(profileId: string): { config: any; spriteData?: Uint8Arra
   return null
 }
 
-export function registerIpcHandlers(): void {
+type Hooks = {
+  onTuningChange?: (isTuning: boolean) => void
+}
+
+export function registerIpcHandlers(hooks: Hooks = {}): void {
   ipcMain.handle('get-settings', () => getSettings())
 
   ipcMain.handle('get-profiles', () => {
@@ -132,8 +137,9 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('set-profile', (_event, id: string) => { setProfile(id); rebuildTrayMenu(); return true })
   ipcMain.handle('set-volume', (_event, v: number) => { setVolume(v); rebuildTrayMenu(); return true })
-  ipcMain.handle('set-theme', (_event, t: string) => { setTheme(t); rebuildTrayMenu(); return true })
   ipcMain.handle('set-mode', (_event, m: string) => { setMode(m); return true })
+  ipcMain.handle('set-is-tuning', (_event, t: boolean) => { setIsTuning(t); hooks.onTuningChange?.(t); return true })
+  ipcMain.handle('set-finish', (_event, f: Finish) => { setFinish(f); rebuildTrayMenu(); return true })
   ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle }) => {
     setCustomConfig(cfg)
     return true

@@ -1,17 +1,8 @@
 import { BrowserWindow, Menu, Tray, app, nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { getSettings, setProfile, setVolume, setTheme } from './store'
-import { Profile } from '../shared/types'
-
-const THEMES = [
-  { id: 'catppuccin', name: 'Catppuccin' },
-  { id: 'tokyo-night', name: 'Tokyo Night' },
-  { id: 'rose-pine', name: 'Rosé Pine' },
-  { id: 'nord', name: 'Nord' },
-  { id: 'dracula', name: 'Dracula' },
-  { id: 'gruvbox', name: 'Gruvbox' },
-]
+import { getSettings, setProfile, setVolume, setFinish } from './store'
+import { Profile, FINISHES, Finish } from '../shared/types'
 
 const ROOT = path.join(__dirname, '..', '..')
 let tray: Tray | null = null
@@ -33,7 +24,6 @@ function buildMenu(): Menu {
   const volPct = Math.round(settings.volume * 100)
   const activeName = profiles.find((p) => p.id === settings.activeProfile)?.name || '—'
 
-  // Profile selection (radio group)
   const profileItems: Electron.MenuItemConstructorOptions[] = profiles.map((p) => ({
     label: p.name,
     type: 'radio' as const,
@@ -45,7 +35,6 @@ function buildMenu(): Menu {
     },
   }))
 
-  // Volume presets (radio group)
   const presets = [0, 25, 50, 75, 100]
   const nearest = presets.reduce((prev, curr) =>
     Math.abs(curr - volPct) < Math.abs(prev - volPct) ? curr : prev
@@ -61,32 +50,31 @@ function buildMenu(): Menu {
     },
   }))
 
+  const finishItems: Electron.MenuItemConstructorOptions[] = FINISHES.map((f) => ({
+    label: f.name,
+    type: 'radio' as const,
+    checked: f.id === settings.finish,
+    click: () => {
+      setFinish(f.id as Finish)
+      win?.webContents.send('finish-changed', f.id)
+      rebuildTrayMenu()
+    },
+  }))
+
+  const activeFinishName = FINISHES.find((f) => f.id === settings.finish)?.name ?? 'Auto'
+
   return Menu.buildFromTemplate([
     { label: activeName, enabled: false },
     { type: 'separator' },
     { label: 'Switch', submenu: profileItems },
-    {
-      label: `Volume · ${volPct}%`,
-      submenu: volumeItems,
-    },
-    {
-      label: 'Theme',
-      submenu: THEMES.map((t) => ({
-        label: t.name,
-        type: 'radio' as const,
-        checked: settings.theme === t.id,
-        click: () => {
-          setTheme(t.id)
-          win?.webContents.send('theme-changed', t.id)
-          rebuildTrayMenu()
-        },
-      })),
-    },
+    { label: `Volume · ${volPct}%`, submenu: volumeItems },
+    { label: `Finish · ${activeFinishName}`, submenu: finishItems },
     { type: 'separator' },
     {
       label: _soundEnabled ? 'Sound On' : 'Muted',
       type: 'checkbox',
       checked: _soundEnabled,
+      accelerator: 'CommandOrControl+Shift+K',
       click: () => {
         _soundEnabled = !_soundEnabled
         win?.webContents.send('sound-toggle', _soundEnabled)
@@ -96,6 +84,7 @@ function buildMenu(): Menu {
     { type: 'separator' },
     {
       label: 'Show Window',
+      accelerator: 'CommandOrControl+Alt+K',
       click: () => {
         win?.show()
         win?.focus()

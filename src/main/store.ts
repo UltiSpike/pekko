@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { AppSettings } from '../shared/types'
+import { AppSettings, Finish } from '../shared/types'
 import {
   DEFAULT_MODE_ID,
   DEFAULT_CUSTOM_STYLE,
@@ -16,8 +16,9 @@ const defaults: AppSettings = {
   activeProfile: 'cherrymx-black-abs',
   volume: 0.7,
   startAtLogin: false,
-  theme: 'gruvbox',
   mode: DEFAULT_MODE_ID,
+  isTuning: false,
+  finish: 'auto',
   customBed: DEFAULT_CUSTOM_BED,
   customBedGainDb: DEFAULT_CUSTOM_BED_GAIN_DB,
   customStyle: { ...DEFAULT_CUSTOM_STYLE },
@@ -80,12 +81,6 @@ export function setStartAtLogin(enabled: boolean): void {
   writeStore(s)
 }
 
-export function setTheme(theme: string): void {
-  const s = readStore()
-  s.theme = theme
-  writeStore(s)
-}
-
 export function setMode(modeId: string): void {
   const s = readStore()
   s.mode = modeId
@@ -97,6 +92,18 @@ export function setCustomConfig(cfg: { bed: BedType; bedGainDb: number; style: M
   s.customBed = cfg.bed
   s.customBedGainDb = cfg.bedGainDb
   s.customStyle = cfg.style
+  writeStore(s)
+}
+
+export function setIsTuning(isTuning: boolean): void {
+  const s = readStore()
+  s.isTuning = isTuning
+  writeStore(s)
+}
+
+export function setFinish(finish: Finish): void {
+  const s = readStore()
+  s.finish = finish
   writeStore(s)
 }
 

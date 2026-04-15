@@ -4,8 +4,13 @@ import { startKeyboardListener, stopKeyboardListener } from './keyboard'
 import { registerIpcHandlers } from './ipc-handlers'
 import { createTray, setSoundEnabled } from './tray'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
+import { getSettings } from './store'
 
 const ROOT = path.join(__dirname, '..', '..')
+
+const WINDOW_WIDTH = 360
+const WINDOW_HEIGHT_CLOSED = 480
+const WINDOW_HEIGHT_OPEN = 720
 
 let mainWindow: BrowserWindow | null = null
 let soundEnabled = true
@@ -16,19 +21,17 @@ function isDev() {
 
 function createWindow() {
   const iconPath = path.join(ROOT, 'assets', 'icons', 'app-icon.icns')
+  const initialHeight = getSettings().isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED
 
   mainWindow = new BrowserWindow({
-    width: 340,
-    height: 440,
+    width: WINDOW_WIDTH,
+    height: initialHeight,
     show: true,
-    resizable: true,
-    minWidth: 280,
-    minHeight: 320,
-    maxWidth: 480,
-    maxHeight: 600,
+    resizable: false,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#00000000',
     vibrancy: 'under-window',
+    roundedCorners: true,
     icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
@@ -39,7 +42,6 @@ function createWindow() {
 
   if (isDev()) {
     mainWindow.loadURL('http://localhost:5173')
-    // Open DevTools only when explicitly requested: DEVTOOLS=1 npm run dev
     if (process.env.DEVTOOLS === '1') {
       mainWindow.webContents.once('did-finish-load', () => {
         mainWindow?.webContents.openDevTools({ mode: 'detach' })
@@ -53,17 +55,24 @@ function createWindow() {
     mainWindow = null
   })
 
+  // Hide on blur — popover behavior. Suspended while the tune drawer is open
+  // so a misclick can't destroy the user's mid-tune context.
   mainWindow.on('blur', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.hide()
-    }
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (getSettings().isTuning) return
+    mainWindow.hide()
   })
+}
+
+function setWindowTuning(isTuning: boolean): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  const [w] = mainWindow.getSize()
+  mainWindow.setSize(w, isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED, true)
 }
 
 app.on('ready', () => {
   console.log('[Pekko] App ready')
 
-  // Hide dock icon on macOS — app lives in menu bar tray only
   if (process.platform === 'darwin' && app.dock) {
     app.dock.hide()
   }
@@ -73,16 +82,14 @@ app.on('ready', () => {
   if (mainWindow) {
     createTray(mainWindow)
 
-    // Prompt for Accessibility permission once, then poll until granted
     if (!checkAccessibilityPermission()) {
       console.log('[Pekko] Requesting Accessibility permission...')
-      requestAccessibilityPermission() // opens System Settings — only once
+      requestAccessibilityPermission()
     }
 
     const pollPermissionAndStart = () => {
       if (!mainWindow || mainWindow.isDestroyed()) return
       if (!checkAccessibilityPermission()) {
-        // Not yet granted — poll without prompting again
         setTimeout(pollPermissionAndStart, 2000)
         return
       }
@@ -93,9 +100,9 @@ app.on('ready', () => {
     pollPermissionAndStart()
   }
 
-  registerIpcHandlers()
+  registerIpcHandlers({ onTuningChange: setWindowTuning })
 
-  // Global shortcut: Cmd+Shift+K to toggle sound on/off
+  // Global: ⇧⌘K mute toggle
   globalShortcut.register('CommandOrControl+Shift+K', () => {
     soundEnabled = !soundEnabled
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -105,7 +112,18 @@ app.on('ready', () => {
     console.log(`[Pekko] Sound ${soundEnabled ? 'ON' : 'OFF'}`)
   })
 
-  console.log('[Pekko] All systems go! (Cmd+Shift+K to toggle)')
+  // Global: ⌥⌘K toggle window
+  globalShortcut.register('CommandOrControl+Alt+K', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (mainWindow.isVisible()) {
+      mainWindow.hide()
+    } else {
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+
+  console.log('[Pekko] All systems go! (⇧⌘K mute · ⌥⌘K toggle window · T tune)')
 })
 
 app.on('window-all-closed', () => {

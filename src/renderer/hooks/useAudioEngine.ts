@@ -9,9 +9,10 @@ declare global {
       onSoundToggle: (cb: (enabled: boolean) => void) => void
       onProfileChanged: (cb: (id: string) => void) => void
       onVolumeChanged: (cb: (v: number) => void) => void
-      onThemeChanged: (cb: (theme: string) => void) => void
-      setTheme: (t: string) => Promise<boolean>
+      onFinishChanged: (cb: (finish: string) => void) => void
       setMode: (m: string) => Promise<boolean>
+      setIsTuning: (t: boolean) => Promise<boolean>
+      setFinish: (f: string) => Promise<boolean>
       setCustomConfig: (cfg: any) => Promise<boolean>
       setSwitchDspOverride: (profileId: string, override: SwitchDspOverride) => Promise<boolean>
       getSettings: () => Promise<any>

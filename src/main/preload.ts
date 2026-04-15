@@ -33,10 +33,10 @@ ipcRenderer.on('volume-changed', (_e, v: number) => {
   if (volumeChangedCallback) volumeChangedCallback(v)
 })
 
-// Theme changed from tray menu
-let themeChangedCallback: ((theme: string) => void) | null = null
-ipcRenderer.on('theme-changed', (_e, theme: string) => {
-  if (themeChangedCallback) themeChangedCallback(theme)
+// Finish changed from tray menu
+let finishChangedCallback: ((finish: string) => void) | null = null
+ipcRenderer.on('finish-changed', (_e, finish: string) => {
+  if (finishChangedCallback) finishChangedCallback(finish)
 })
 
 contextBridge.exposeInMainWorld('api', {
@@ -44,9 +44,10 @@ contextBridge.exposeInMainWorld('api', {
   onSoundToggle: (cb: (enabled: boolean) => void) => { soundToggleCallback = cb },
   onProfileChanged: (cb: (id: string) => void) => { profileChangedCallback = cb },
   onVolumeChanged: (cb: (v: number) => void) => { volumeChangedCallback = cb },
-  onThemeChanged: (cb: (theme: string) => void) => { themeChangedCallback = cb },
-  setTheme:        (t: string)  => ipcRenderer.invoke('set-theme', t),
+  onFinishChanged: (cb: (finish: string) => void) => { finishChangedCallback = cb },
   setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
+  setIsTuning:     (t: boolean) => ipcRenderer.invoke('set-is-tuning', t),
+  setFinish:       (f: string)  => ipcRenderer.invoke('set-finish', f),
   setCustomConfig: (cfg: any)   => ipcRenderer.invoke('set-custom-config', cfg),
   setSwitchDspOverride: (profileId: string, override: any) =>
     ipcRenderer.invoke('set-switch-dsp-override', { profileId, override }),

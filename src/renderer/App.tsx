@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useProfiles } from './hooks/useProfiles'
 import VolumeSlider from './components/VolumeSlider'
-import PermissionBanner from './components/PermissionBanner'
-import TypingIndicator from './components/TypingIndicator'
+import LedLadder from './components/LedLadder'
+import StatusLed from './components/StatusLed'
+import HelpPanel from './components/HelpPanel'
 import TuneView from './components/TuneView'
 import {
   MODES,
@@ -18,41 +19,32 @@ import {
   ModeStyle,
   SwitchDspOverride,
 } from '@shared/modes'
+import { Finish, FINISHES } from '@shared/types'
 import './App.css'
 
 const hasApi = typeof window !== 'undefined' && !!window.api
-
-const THEMES = [
-  { id: 'catppuccin', name: 'Catppuccin' },
-  { id: 'tokyo-night', name: 'Tokyo Night' },
-  { id: 'rose-pine', name: 'Rosé Pine' },
-  { id: 'nord', name: 'Nord' },
-  { id: 'dracula', name: 'Dracula' },
-  { id: 'gruvbox', name: 'Gruvbox' },
-] as const
-
-// mode IDs for cycling: all presets + custom at the end
 const MODE_IDS = [...MODES.map(m => m.id), 'custom']
+const META_REVEAL_MS = 1500
 
 export default function App() {
   const { profiles, loading } = useProfiles()
   const [activeProfile, setActiveProfile] = useState('cherrymx-black-abs')
   const [volume, setVolume] = useState(0.7)
   const [hasPermission, setHasPermission] = useState(true)
-  const [theme, setTheme] = useState('gruvbox')
   const [mode, setMode] = useState<string>(DEFAULT_MODE_ID)
 
-  // Custom mode state (persisted)
   const [customBed, setCustomBed] = useState<BedType>(DEFAULT_CUSTOM_BED)
   const [customBedGainDb, setCustomBedGainDb] = useState<number>(DEFAULT_CUSTOM_BED_GAIN_DB)
   const [customStyle, setCustomStyle] = useState<ModeStyle>({ ...DEFAULT_CUSTOM_STYLE })
 
-  // Per-switch DSP overrides keyed by profileId. Sparse: only fields the user touched.
   const [switchDspOverrides, setSwitchDspOverrides] = useState<Record<string, SwitchDspOverride>>({})
 
   const [isTuning, setIsTuning] = useState(false)
+  const [finish, setFinish] = useState<Finish>('auto')
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [metaVisible, setMetaVisible] = useState(false)
+  const metaTimerRef = useRef<number | null>(null)
 
-  // Resolved active Mode (object) — memoized so the engine effect doesn't re-run on every render
   const activeMode = useMemo(() => {
     if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb)
     return MODES.find(m => m.id === mode) ?? MODES[0]
@@ -61,7 +53,6 @@ export default function App() {
   const activeProfileObj = profiles.find(p => p.id === activeProfile)
   const presetDsp = activeProfileObj?.dsp ?? DEFAULT_SWITCH_DSP
   const overrideForActive = switchDspOverrides[activeProfile]
-  // Memoized so the engine effect only fires when the resolved DSP actually changes.
   const effectiveDsp = useMemo(
     () => resolveSwitchDsp(activeProfileObj?.dsp, overrideForActive),
     [activeProfileObj, overrideForActive]
@@ -69,20 +60,32 @@ export default function App() {
 
   const { bluetoothWarning, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode, effectiveDsp)
 
-  // Load persisted settings
+  // Reveal meta line briefly after keyboard navigation
+  const flashMeta = useCallback(() => {
+    setMetaVisible(true)
+    if (metaTimerRef.current) window.clearTimeout(metaTimerRef.current)
+    metaTimerRef.current = window.setTimeout(() => setMetaVisible(false), META_REVEAL_MS)
+  }, [])
+
   useEffect(() => {
     if (!hasApi) return
     window.api.getSettings().then((s) => {
       setActiveProfile(s.activeProfile)
       setVolume(s.volume)
-      if (s.theme) setTheme(s.theme)
       if (s.mode) setMode(s.mode)
+      if (typeof s.isTuning === 'boolean') setIsTuning(s.isTuning)
+      if (s.finish) setFinish(s.finish)
       if (s.customBed) setCustomBed(s.customBed)
       if (typeof s.customBedGainDb === 'number') setCustomBedGainDb(s.customBedGainDb)
       if (s.customStyle) setCustomStyle(s.customStyle)
       if (s.switchDspOverrides) setSwitchDspOverrides(s.switchDspOverrides)
     }).catch(console.error)
   }, [])
+
+  // Apply finish to <html>
+  useEffect(() => {
+    document.documentElement.setAttribute('data-finish', finish)
+  }, [finish])
 
   useEffect(() => {
     if (!hasApi) return
@@ -92,40 +95,39 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
-  // Listen for tray menu changes
   useEffect(() => {
     if (!hasApi) return
-    window.api.onProfileChanged(setActiveProfile)
+    window.api.onProfileChanged((id) => { setActiveProfile(id); flashMeta() })
     window.api.onVolumeChanged(setVolume)
-    window.api.onThemeChanged(setTheme)
-  }, [])
-
-  // Apply theme to DOM
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+    window.api.onFinishChanged((f) => setFinish(f as Finish))
+  }, [flashMeta])
 
   const handleProfileChange = useCallback(async (id: string) => {
     setActiveProfile(id)
+    flashMeta()
     if (hasApi) await window.api.setProfile(id)
-  }, [])
+  }, [flashMeta])
 
   const handleVolumeChange = async (v: number) => {
     setVolume(v)
     if (hasApi) await window.api.setVolume(v)
   }
 
-  const handleThemeChange = useCallback(async (id: string) => {
-    setTheme(id)
-    if (hasApi) await window.api.setTheme(id)
-  }, [])
-
   const handleModeChange = useCallback(async (id: string) => {
     setMode(id)
     if (hasApi) await window.api.setMode(id)
   }, [])
 
-  // Custom config persistence — debounced is overkill; writes are tiny JSON
+  const handleTuningChange = useCallback(async (next: boolean) => {
+    setIsTuning(next)
+    if (hasApi) await window.api.setIsTuning(next)
+  }, [])
+
+  const handleFinishChange = useCallback(async (next: Finish) => {
+    setFinish(next)
+    if (hasApi) await window.api.setFinish(next)
+  }, [])
+
   const persistCustom = useCallback(async (bed: BedType, bedGainDb: number, style: ModeStyle) => {
     if (!hasApi) return
     await window.api.setCustomConfig({ bed, bedGainDb, style })
@@ -156,7 +158,6 @@ export default function App() {
     persistCustom(bed, gain, style)
   }, [persistCustom])
 
-  // Per-switch DSP override handlers. Override is sparse — only includes fields the user has changed.
   const handleSwitchDspChange = useCallback((override: SwitchDspOverride) => {
     setSwitchDspOverrides((prev) => ({ ...prev, [activeProfile]: override }))
     if (hasApi) window.api.setSwitchDspOverride(activeProfile, override)
@@ -173,8 +174,8 @@ export default function App() {
 
   const activeData = profiles.find(p => p.id === activeProfile)
   const activeIndex = profiles.findIndex(p => p.id === activeProfile)
+  const typeBadge = activeData?.type?.toUpperCase()
   const isHQ = activeProfile.startsWith('cherrymx-') || activeProfile.startsWith('topre-purple') || activeProfile === 'nk-cream'
-  const themeIndex = THEMES.findIndex(t => t.id === theme)
 
   const cycleProfile = useCallback((dir: number) => {
     if (profiles.length === 0 || activeIndex === -1) return
@@ -182,130 +183,141 @@ export default function App() {
     handleProfileChange(profiles[next].id)
   }, [profiles, activeIndex, handleProfileChange])
 
-  const cycleTheme = useCallback((dir: number) => {
-    const next = (themeIndex + dir + THEMES.length) % THEMES.length
-    handleThemeChange(THEMES[next].id)
-  }, [themeIndex, handleThemeChange])
-
   const modeIdx = MODE_IDS.indexOf(mode)
   const cycleMode = useCallback((dir: number) => {
     const next = (modeIdx + dir + MODE_IDS.length) % MODE_IDS.length
     handleModeChange(MODE_IDS[next])
   }, [modeIdx, handleModeChange])
 
-  // Keyboard: ← → profiles, Q/E themes
+  // Keyboard — ← → switch, [ ] mode, T drawer, / help, Esc close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTuning) return // don't hijack keys while tuning
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      // Don't hijack keystrokes in inputs (sliders exist; if a text field is added later, still safe)
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) {
+        // But Esc / ⇧⌘K still allowed elsewhere; none of our inputs capture letters anyway
+        if (e.key !== 'Escape') return
+      }
       if (e.key === 'ArrowLeft') cycleProfile(-1)
       else if (e.key === 'ArrowRight') cycleProfile(1)
-      else if (e.key === 'q' || e.key === 'Q') cycleTheme(-1)
-      else if (e.key === 'e' || e.key === 'E') cycleTheme(1)
+      else if (e.key === '[') cycleMode(-1)
+      else if (e.key === ']') cycleMode(1)
+      else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault()
+        handleTuningChange(!isTuning)
+      } else if (e.key === '/') {
+        e.preventDefault()
+        setHelpOpen((o) => !o)
+      } else if (e.key === 'Escape') {
+        if (helpOpen) setHelpOpen(false)
+        else if (isTuning) handleTuningChange(false)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cycleProfile, cycleTheme, isTuning])
-
-  if (isTuning) {
-    return (
-      <div className="app">
-        <TuneView
-          profileName={activeData?.name ?? activeProfile}
-          presetDsp={presetDsp}
-          effectiveDsp={effectiveDsp}
-          dspOverride={overrideForActive ?? {}}
-          onSwitchDspChange={handleSwitchDspChange}
-          onResetSwitchDsp={resetSwitchDsp}
-          modeName={activeMode.name}
-          isCustomMode={mode === 'custom'}
-          bed={customBed}
-          bedGainDb={customBedGainDb}
-          style={customStyle}
-          onBedChange={handleCustomBedChange}
-          onBedGainChange={handleCustomBedGainChange}
-          onStyleChange={handleCustomStyleChange}
-          onResetMode={resetCustom}
-          onClose={() => setIsTuning(false)}
-        />
-      </div>
-    )
-  }
+  }, [cycleProfile, cycleMode, isTuning, helpOpen, handleTuningChange])
 
   return (
     <div className="app">
-      {/* Title bar */}
-      <div className="titlebar">
-        <div className="titlebar-left">
-          <svg className="titlebar-mascot" width="16" height="16" viewBox="0 0 256 256">
-            <path fill="currentColor" d="M236.44,73.34 L213.21,57.86A60,60,0,0,0,156,16h-.29C122.79,16.16,96,43.47,96,76.89V96.63L11.63,197.88l-.1.12A16,16,0,0,0,24,224h88a104.11,104.11,0,0,0,104-104V100.28l20.44-13.62a8,8,0,0,0,0-13.32ZM126.15,133.12l-60,72a8,8,0,1,1-12.29-10.24l60-72a8,8,0,1,1,12.29,10.24ZM164,80a12,12,0,1,1,12-12,12,12,0,0,1-12,12Z"/>
-          </svg>
-          <h1>Pekko</h1>
-        </div>
-        <div className="titlebar-right">
-          {!soundEnabled && <span className="muted-badge">MUTE</span>}
-          <span>⌘⇧K</span>
+      {/* Top plate — help button, status LED */}
+      <div className="top-plate">
+        <div className="help-wrap">
+          <button
+            className={`help-button${helpOpen ? ' on' : ''}`}
+            onClick={() => setHelpOpen((o) => !o)}
+            aria-label="Shortcuts and finish"
+            aria-expanded={helpOpen}
+          >
+            ?
+          </button>
+          <StatusLed
+            active={typingActive && soundEnabled}
+            muted={!soundEnabled}
+            needsPermission={!hasPermission}
+            bluetoothWarning={bluetoothWarning}
+            finishName={FINISHES.find(f => f.id === finish)?.name ?? finish}
+            onRequestPermission={() => hasApi && window.api.requestPermissions()}
+          />
+          {helpOpen && (
+            <HelpPanel
+              finish={finish}
+              onFinishChange={handleFinishChange}
+              onClose={() => setHelpOpen(false)}
+            />
+          )}
         </div>
       </div>
 
-      {/* Alerts */}
-      {!hasPermission && (
-        <PermissionBanner onRequest={() => hasApi && window.api.requestPermissions()} />
-      )}
-      {bluetoothWarning && (
-        <div className="bluetooth-warning">
-          Bluetooth detected — wired output recommended
-        </div>
-      )}
-
-      {/* Mode — the primary axis (bed + style) */}
-      <div className="mode-group" aria-label="Soundscape mode">
-        <div className="mode-nav">
-          <button className="nav-btn" onClick={() => cycleMode(-1)} aria-label="Previous mode">{'\u2039'}</button>
-          <div className="mode-name">{activeMode.name}</div>
-          <button className="nav-btn" onClick={() => cycleMode(1)} aria-label="Next mode">{'\u203a'}</button>
-        </div>
-        <div className="mode-description" aria-live="polite">{activeMode.description}</div>
+      {/* Mode chip */}
+      <div className="mode-block">
+        <button className="mode-nav" onClick={() => cycleMode(-1)} aria-label="Previous mode">{'\u2039'}</button>
+        <div className="mode-chip">{activeMode.name}</div>
+        <button className="mode-nav" onClick={() => cycleMode(1)} aria-label="Next mode">{'\u203a'}</button>
       </div>
 
-      {/* Current profile */}
-      <div className={`current-profile ${activeData ? `accent-${activeData.type}` : ''}`}>
+      {/* Switch hero */}
+      <div className="switch-block">
         {loading ? (
           <div className="loading">Loading</div>
         ) : activeData ? (
           <>
-            <div className="profile-nav">
-              <button className="nav-btn" onClick={() => cycleProfile(-1)}>{'\u2039'}</button>
-              <div className="profile-current-name">{activeData.name}</div>
-              <button className="nav-btn" onClick={() => cycleProfile(1)}>{'\u203a'}</button>
+            <div className="switch-name">{activeData.name}</div>
+            <div className="switch-nav-row">
+              <button className="switch-nav" onClick={() => cycleProfile(-1)} aria-label="Previous switch">{'\u2039'}</button>
+              <div className={`switch-meta ${metaVisible ? 'visible' : ''}`}>
+                {[typeBadge, isHQ ? 'HQ' : null, `${activeIndex + 1} / ${profiles.length}`]
+                  .filter(Boolean).join('   ·   ')}
+              </div>
+              <button className="switch-nav" onClick={() => cycleProfile(1)} aria-label="Next switch">{'\u203a'}</button>
             </div>
-            <div className="profile-current-meta">
-              <span className={`type-badge type-${activeData.type}`}>
-                {activeData.type.toUpperCase()}
-              </span>
-              {isHQ && <span className="hq-badge">HQ</span>}
-              <button className="tune-chip" onClick={() => setIsTuning(true)} aria-label="Tune switch sound">
-                <span className="tune-chip-icon" aria-hidden="true">{'\u2261'}</span>
-                TUNE
-              </button>
-            </div>
-            <div className="profile-current-desc">{activeData.description}</div>
-            <div className="profile-counter">{activeIndex + 1} / {profiles.length}</div>
+            {!isTuning && <div className="switch-desc">{activeData.description}</div>}
           </>
         ) : null}
       </div>
 
-      {/* Controls */}
-      <div className="controls">
-        <VolumeSlider volume={volume} onChange={handleVolumeChange} />
-        <TypingIndicator wpm={wpm} active={typingActive} />
-      </div>
+      {!isTuning && (
+        <>
+          <hr className="rule" />
+          <LedLadder wpm={wpm} active={typingActive} muted={!soundEnabled} />
+          <VolumeSlider volume={volume} onChange={handleVolumeChange} />
+          <hr className="rule" />
+          <div className="tune-button-row">
+            <button
+              className={`tune-button ${isTuning ? 'active' : ''}`}
+              onClick={() => handleTuningChange(true)}
+            >
+              {'[ Tune · T ]'}
+            </button>
+          </div>
+        </>
+      )}
 
-      {/* Footer — theme switcher */}
-      <div className="footer">
-        <button className="footer-nav-btn" onClick={() => cycleTheme(-1)} aria-label="Previous theme">{'\u2039'}</button>
-        <span className="footer-theme">{THEMES[themeIndex]?.name}</span>
-        <button className="footer-nav-btn" onClick={() => cycleTheme(1)} aria-label="Next theme">{'\u203a'}</button>
-      </div>
+      {isTuning && (
+        <>
+          <div className="drawer-compact-row">
+            <LedLadder wpm={wpm} active={typingActive} muted={!soundEnabled} />
+            <VolumeSlider volume={volume} onChange={handleVolumeChange} />
+          </div>
+          <TuneView
+            presetDsp={presetDsp}
+            effectiveDsp={effectiveDsp}
+            dspOverride={overrideForActive ?? {}}
+            onSwitchDspChange={handleSwitchDspChange}
+            onResetSwitchDsp={resetSwitchDsp}
+            modeName={activeMode.name}
+            isCustomMode={mode === 'custom'}
+            bed={customBed}
+            bedGainDb={customBedGainDb}
+            style={customStyle}
+            onBedChange={handleCustomBedChange}
+            onBedGainChange={handleCustomBedGainChange}
+            onStyleChange={handleCustomStyleChange}
+            onResetMode={resetCustom}
+            onClose={() => handleTuningChange(false)}
+          />
+        </>
+      )}
     </div>
   )
 }

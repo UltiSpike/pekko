@@ -20,14 +20,14 @@ Flow-state audio for macOS · Made for deep work · Open source · Fully offline
 
 &nbsp;
 
-<!-- TODO: 30s screen recording — launch → type → switch profile → switch theme -->
+<!-- TODO: 30s screen recording — launch → type → switch profile → open tune drawer -->
 <!-- <p align="center"><img src="assets/preview.gif" width="640" /></p> -->
 
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```
 
-`‹` `›` next mode · `←` `→` switch profiles · `Q` `E` switch themes · `⇧⌘K` global toggle
+`←` `→` switch profile · `[` `]` cycle mode · `T` tune drawer · `⇧⌘K` mute · `⌥⌘K` toggle window
 
 <sub>macOS 11+ / Node 18+ / Accessibility permission required on first launch — reads keycodes only, never input content (<a href="PRIVACY.md">privacy statement</a>)</sub>
 
@@ -89,7 +89,7 @@ Per-mode morph: low-shelf weight, wet mix, air LPF, per-key jitter. Constant acr
 
 &nbsp;
 
-## Thirteen switches, six themes
+## Thirteen switches
 
 | Type | Switches |
 |------|----------|
@@ -99,7 +99,7 @@ Per-mode morph: low-shelf weight, wet mix, air LPF, per-key jitter. Constant acr
 
 <sub>*(HQ)* = per-key high-quality recording (sprite or multi-file). Others use 5-variant kbsim packs.</sub>
 
-Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
+A single instrument-panel aesthetic follows your system light/dark. See [docs/design/CHASSIS.md](docs/design/CHASSIS.md).
 
 &nbsp;
 

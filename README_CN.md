@@ -25,7 +25,7 @@ macOS 打字声景引擎 · 为深度工作设计 · 开源 · 完全离线
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```
 
-`‹` `›` 切换 Mode · `←` `→` 切换轴体 · `Q` `E` 切换主题 · `⇧⌘K` 全局开关
+`←` `→` 切换轴体 · `[` `]` 切换 Mode · `T` 调音抽屉 · `⇧⌘K` 静音 · `⌥⌘K` 唤起 / 隐藏窗口
 
 <sub>macOS 11+ / Node 18+ / 首次启动需授予辅助功能权限 — 仅读取键码，不读取输入内容（<a href="PRIVACY.md">隐私声明</a>）</sub>
 
@@ -87,7 +87,7 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 &nbsp;
 
-## 十三种轴体，六套主题
+## 十三种轴体
 
 | 类型 | 轴体 |
 |------|------|
@@ -97,7 +97,7 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 <sub>*(HQ)* = 逐键高保真录音（sprite 或 multi-file 格式）。其他为 5 变体 kbsim 采样包。</sub>
 
-Catppuccin · Tokyo Night · Rosé Pine · Nord · Dracula · Gruvbox
+统一的仪器面板视觉，自动跟随系统 light / dark。详见 [docs/design/CHASSIS.md](docs/design/CHASSIS.md)。
 
 &nbsp;
 
