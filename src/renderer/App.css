@@ -336,17 +336,16 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
    Idle = pilot-lit (--led-on @ 35% via --led-dim), always on.
    Long-cycle 47s opacity drift co-prime with the 6s Filament Breath so the two
    motions never resync — long-idle states feel in-flux instead of frozen. */
+/* Status LED — pure state indicator (v2.5.1: no click, no tooltip, no button).
+   Shape + color encode state (see StatusLed.tsx). Idle pilot-lit with a 47s
+   slow opacity drift that's co-prime with the 6s mode-chip filament breath. */
 .status-led {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--led-dim);
-  -webkit-app-region: no-drag;
-  cursor: pointer;
   transition: background 180ms ease, width 180ms ease, height 180ms ease;
   position: relative;
-  border: none;
-  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -355,9 +354,8 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   font-weight: 700;
   line-height: 1;
   color: var(--chassis);
-  /* Idle pilot drift — opacity 0.85 ↔ 1.0 on a 47s cycle.
-     Co-prime with mode-chip filament breath (6s) — combined rhythm unpredictable. */
   animation: pilot-drift 47s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  flex-shrink: 0;
 }
 
 .status-led.active {
@@ -398,31 +396,6 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 @keyframes pilot-drift {
   0%, 100% { opacity: 0.85; }
   50%      { opacity: 1.00; }
-}
-
-.status-tooltip {
-  position: absolute;
-  top: 16px;
-  right: 0;
-  min-width: 200px;
-  background: var(--chassis);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r);
-  padding: var(--s-3);
-  font-size: 11px;
-  color: var(--ink-2);
-  line-height: 1.45;
-  z-index: 20;
-}
-
-.status-tooltip .status-action {
-  margin-top: var(--s-2);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--interactive);
-  cursor: pointer;
 }
 
 /* ---- Help button + popover panel ---- */

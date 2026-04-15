@@ -4,22 +4,22 @@ interface Props {
   active: boolean             // currently typing
   muted: boolean              // sound disabled
   needsPermission: boolean    // shape-encoded as `!` glyph (panel handles inline error)
-  finishName: string
+  finishName: string          // unused in v2.5.1 — kept for potential future readout
 }
 
-// ONYX v2.5 — Status LED. Always pilot-lit (--led-dim @ idle).
+// ONYX v2.5.1 — Status LED is a PURE STATE INDICATOR. No tooltip, no click action.
+// Like the pilot light on a real instrument: you don't poke it for a menu.
+//
 // State encoded in BOTH color and shape (color-blind safe):
-//   idle    → solid disc, --led-dim
-//   active  → solid disc, --led-on, single 200ms pulse
+//   idle    → solid disc, --led-dim (pilot-lit, always on)
+//   active  → solid disc, --led-on, single 200ms pulse per keystroke
 //   muted   → hollow ring, --led-mute, slow breathe
 //   warn    → 12px disc with `!` glyph (no blink — seizure-adjacent)
 //
-// Warn = permission only. Bluetooth latency is an info readout in the help
-// panel (v2.5 — previously also triggered warn, felt paternalistic).
+// For full state / shortcut / finish info, open the help panel (/ or ⌘?).
 export default function StatusLed({
-  active, muted, needsPermission, finishName,
+  active, muted, needsPermission,
 }: Props) {
-  const [open, setOpen] = useState(false)
   const hasWarning = needsPermission
 
   // Pulse on each typing activation. CSS animation is one-shot via key remount.
@@ -34,23 +34,16 @@ export default function StatusLed({
   ].filter(Boolean).join(' ')
 
   return (
-    <div style={{ position: 'relative' }}>
-      <button
-        key={pulseKey}
-        className={cls}
-        onClick={() => setOpen((o) => !o)}
-        aria-label={
-          needsPermission ? 'Permission required (see panel)' :
-          muted           ? 'Sound muted' :
-          active          ? 'Sound active' : 'Idle'
-        }
-      />
-      {open && !hasWarning && (
-        <div className="status-tooltip" role="tooltip">
-          <div>{muted ? 'Muted — press ⇧⌘K to unmute' : 'Sound on — ⇧⌘K to mute'}</div>
-          <div style={{ marginTop: 4, opacity: 0.7 }}>Finish · {finishName}</div>
-        </div>
-      )}
-    </div>
+    <span
+      key={pulseKey}
+      className={cls}
+      role="status"
+      aria-live="polite"
+      aria-label={
+        needsPermission ? 'Permission required (see panel)' :
+        muted           ? 'Sound muted' :
+        active          ? 'Sound active' : 'Idle'
+      }
+    />
   )
 }
