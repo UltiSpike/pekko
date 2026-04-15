@@ -125,10 +125,13 @@ rush: {
 
 ```ts
 interface AppSettings {
-  // ... 现有字段
+  // ... 现有字段（activeProfile / volume / mode / holdRepeat / uiSounds /
+  // customBed / customStyle / switchDspOverrides 等）
   customArcadeEnabled: boolean  // NEW, 默认 false
 }
 ```
+
+`customArcadeEnabled` 与现有 `uiSounds` / `holdRepeat` 同为**opt-in 工具人格 toggle**的模式，并在 `src/main/store.ts` 的 `defaults` 常量中设 `false` 默认值、在 `mergeSettings` 中保持 boolean 强类型判断。
 
 `buildCustomMode(style, bed, bedGainDb)` 扩展为 `buildCustomMode(style, bed, bedGainDb, arcadeEnabled)`，透传至 `Mode.arcadeEnabled`。
 
@@ -156,6 +159,19 @@ interface AppSettings {
 ### 状态重置
 
 切换 Mode（Rush ↔ 其他）时 combo 立即清零，L4 pad 淡出 500ms——**Mode 切换即新会话**，不跨 Mode 保留 combo。
+
+### Hold-repeat 规则
+
+`playSound(type = 'repeat')` 路径（`keyboard.ts` flag=2，由 ⌫ ⌦ ← → ↑ ↓ 长按 + `holdRepeat` toggle 触发）**对 combo 逻辑完全不可见**：
+
+- 不增加 combo
+- 不参与 combo reset 计时——inter-key 计时**只看 `type === 'down'` 事件**，repeat 事件被跳过
+- 不进入 PERFECT 窗口的方差计算
+- **不触发任何 overlay 层**——只播主路径 repeat-path 轴体音（沿用现有 `playSound('repeat')` 的 fixed intensity 0.50 + 跳过 jitter/top-down-balance 策略）
+
+理由：hold-repeat 是"按住一个键"的物理现实，不是 intentful keystroke。逻辑上不应增益 combo；触发 overlay 会在 5 秒狂删时砸出 50 次 kick，刺耳且违背"combo 是流畅打字的奖励"的语义。这条规则和现有 `playSound('repeat')` 已 skip history/WPM/jitter 的决策完全一致。
+
+**实际效果**：用户按 "hello" 后长按 ⌫ 清掉 3 秒，再开始打字——3 秒间隔 > 600ms 阈值，combo 自然 reset；但长按过程本身不增不减 combo、不触发 overlay。干净。
 
 ---
 
@@ -231,6 +247,22 @@ Overlay 层**不做**以下任何一项：
 **PERFECT 触发**：亮闪 200ms（当前阶梯饱和度 +30%）后回复——2s 冷却避免连续闪烁。
 
 **Combo 断开**：500ms 淡回原色，**不闪**——悄悄退场，不打扰。
+
+### macOS 托盘图标约束
+
+现有 `src/main/tray.ts` 使用 `img.setTemplateImage(true)`——菜单栏标准做法，让图标在 light / dark 菜单栏下自动反色。**template image 不支持自定义彩色渲染**，"暖色微染"无法直接叠在 template 上。
+
+Rush HUD 的图标策略：
+
+1. **Combo 0–1（idle）**：保持 **template 模式**，完全符合 macOS 菜单栏惯例，Pekko 品牌感不变
+2. **Combo ≥ 2（active）**：切到 **非 template 模式**，用预渲染彩色帧（候选暖色 warm amber `#E8A84C`——需在 light + dark 菜单栏都视觉可辨）
+3. **阶梯间差异**：通过**饱和度递增 + 微幅尺寸 / 不透明度变化**实现（不靠不同 hue），对标现有 "20% → 50% → 慢脉冲 → 快脉冲" 的感知分级
+4. **脉冲动画**：预渲染 N 帧（例如 60 BPM = 8 帧循环 1s / 90 BPM = 10-12 帧 0.67s），`setInterval + tray.setImage(frame)` 顺序切换。预渲染零运行时开销，换少量 bundle 体积
+5. **PERFECT 闪**：一帧"饱和度 +30% 高亮图"，200ms 后切回当前阶梯稳态帧
+
+**退出 Rush / 切 arcade off**：图标立即切回 template 模式，无残留帧。
+
+具体色值、帧数、脉冲曲线都在实现阶段 A/B 敲定（见 §12）。
 
 ### 工程实现
 
@@ -417,9 +449,12 @@ v1 明确不做，未来可议：
 
 1. **具体 CC0 采样文件**——到 freesound.org 实际挑选时再定（clap + swell 各 1-2 个备选）
 2. **合成 kick / hat 的参数**——基于 DAW A/B 或 Web Audio 直接试听调音，体感优先
-3. **托盘图标的"暖色"**——具体 hue 实现时 A/B（考虑 macOS light/dark menu bar 两套）
-4. **Pulse 动画曲线**——`ease-in-out` 还是 `sine`，实现阶段对比
-5. **CC0 采样是否预打包进 app bundle** 还是首次激活时从某处下载——v1 预打包，体积预算 <200 KB 容得下
+3. **非 template 图标的具体色值**——`#E8A84C` warm amber 为候选，需在 macOS light + dark 菜单栏下 A/B 验证可辨识度
+4. **脉冲动画的帧数 / 频率**——60 BPM (1s/cycle, 8 帧) vs 90 BPM (0.67s/cycle, 10-12 帧) 实现阶段对比
+5. **Pulse 动画曲线**——`ease-in-out` 还是 `sine`，实现阶段对比
+6. **阶梯 20%/50% 饱和度的具体映射**——非 template 模式下是"两张不同饱和度的底图"还是"同一张底图 + opacity"
+7. **PERFECT 闪的具体帧处理**——饱和度 +30% 足够辨识，还是需要额外形状变化
+8. **CC0 采样是否预打包进 app bundle** 还是首次激活时按需加载——v1 预打包，体积预算 <200 KB 容得下
 
 ---
 
@@ -435,6 +470,9 @@ v1 明确不做，未来可议：
 6. 切到 Classic Mech / Thock：托盘图标恢复默认、overlay pool 完全释放（内存测量）
 7. Custom Mode 开启 `customArcadeEnabled`：overlay + HUD 行为与 Rush Mode 一致
 8. 连续打字 5 分钟：无 voice starvation、无 compressor pump、无 click artifacts
+9. 托盘图标在 macOS **light + dark 菜单栏下**，Rush 激活态彩色帧都清晰可辨、不糊成黑块或白块
+10. Rush ↔ 其他 Mode 切换时，托盘图标正确切换 template / non-template 模式，无残留帧
+11. 长按 ⌫ 持续 5 秒（hold-repeat 开启）：combo 无变化、overlay 层无触发，只播 repeat-path 轴体音
 
 ---
 
@@ -455,12 +493,16 @@ v1 明确不做，未来可议：
 
 ## 附录 B · 与现有系统的对接点
 
-- `src/shared/modes.ts`：扩 `Mode` 接口、新增 `STYLE.rush` / Rush Mode 定义、扩 `buildCustomMode`
-- `src/renderer/audio/AudioEngine.ts`：`playSound()` 调用 `overlayLayer.onKeypress()`；`setMode()` 切换时 activate / deactivate
-- `src/renderer/audio/arcade/`（新）：`ArcadeOverlayLayer.ts` + `ArcadeHudController.ts` + `synth/*` + `samples/*`
-- `src/main/tray.ts`：新增 IPC handler 接收 hud state 更新图标
-- `src/main/preload.ts`：新增 `updateArcadeHud(state)` 到 contextBridge 白名单
-- `src/main/store.ts`：`AppSettings.customArcadeEnabled` 字段持久化
+- `src/shared/modes.ts`：扩 `Mode` 接口加 `arcadeEnabled: boolean`；新增 `STYLE.rush` + Rush Mode 定义；扩 `buildCustomMode` 签名
+- `src/shared/types.ts`：`AppSettings` 加 `customArcadeEnabled: boolean`
+- `src/renderer/audio/AudioEngine.ts`：`playSound()` 中 `type === 'down'` 分支末尾调 `overlayLayer.onKeypress()`；`type === 'repeat'` 分支**不触发** overlay；`setMode()` 切换时 activate / deactivate overlay + HUD
+- `src/renderer/audio/arcade/`（新目录）：`ArcadeOverlayLayer.ts` + `ArcadeHudController.ts` + `synth/kick.ts` + `synth/hat.ts` + `samples/clap.wav` + `samples/swell.wav`
+- `src/main/tray.ts`：新增 `updateArcadeHud(state)` 导出函数，接收渲染进程的 hud 状态并切 template / 非 template image；新增预渲染帧资源路径
+- `src/main/preload.ts`：新增 `updateArcadeHud(state)` 到 contextBridge 白名单（`ipcRenderer.send`，非 invoke）
+- `src/main/ipc-handlers.ts`：注册 `update-arcade-hud` channel handler，转发给 `tray.ts`
+- `src/main/store.ts`：`defaults` 常量加 `customArcadeEnabled: false`，`mergeSettings` 加 boolean 类型判断
+- `src/renderer/components/TuneView.tsx`：Custom Mode tune 面板加 `Arcade feedback` toggle 行（和 UI Sounds / Hold-repeat 的视觉节奏对齐）
+- `assets/icons/`：新增 Rush 激活态预渲染帧资源（warm amber 色系 × N 帧循环 + PERFECT 高亮帧）
 
 ## 附录 C · 音游元素取舍
 
