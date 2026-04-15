@@ -8,6 +8,10 @@ const ROOT = path.join(__dirname, '..', '..')
 let tray: Tray | null = null
 let win: BrowserWindow | null = null
 let _soundEnabled = true
+// Gate for pre-measurement race — see index.ts createWindow comment. The tray
+// must not reveal the window at the provisional MIN_H size before the
+// renderer's first ResizeObserver fire has corrected it.
+let canShow: () => boolean = () => true
 
 function loadProfiles(): Profile[] {
   try {
@@ -96,6 +100,7 @@ function buildMenu(): Menu {
       label: 'Show Window',
       accelerator: 'CommandOrControl+Alt+K',
       click: () => {
+        if (!canShow()) return
         win?.show()
         win?.focus()
       },
@@ -124,9 +129,13 @@ function createTrayIcon(): Tray {
   }
 }
 
-export function createTray(mainWindow: BrowserWindow): Tray | null {
+export function createTray(
+  mainWindow: BrowserWindow,
+  getFirstMeasureApplied: () => boolean = () => true
+): Tray | null {
   try {
     win = mainWindow
+    canShow = getFirstMeasureApplied
     tray = createTrayIcon()
     tray.setToolTip('Pekko')
     tray.setContextMenu(buildMenu())
@@ -134,7 +143,7 @@ export function createTray(mainWindow: BrowserWindow): Tray | null {
     tray.on('click', () => {
       if (win?.isVisible()) {
         win.hide()
-      } else {
+      } else if (canShow()) {
         win?.show()
         win?.focus()
       }

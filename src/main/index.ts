@@ -69,6 +69,8 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    firstMeasureApplied = false
+    isHelpOpen = false
   })
 
   // Hide on blur — popover behavior. Suspended while tune drawer OR help is
@@ -98,7 +100,7 @@ app.on('ready', () => {
   createWindow()
 
   if (mainWindow) {
-    createTray(mainWindow)
+    createTray(mainWindow, () => firstMeasureApplied)
 
     if (!checkAccessibilityPermission()) {
       console.log('[Pekko] Requesting Accessibility permission...')
@@ -144,12 +146,15 @@ app.on('ready', () => {
     console.log(`[Pekko] Sound ${soundEnabled ? 'ON' : 'OFF'}`)
   })
 
-  // Global: ⌥⌘K toggle window
+  // Global: ⌥⌘K toggle window.
+  // Suppressed during the brief pre-measurement window on launch — otherwise
+  // user would see the provisional MIN_H size before the renderer's first
+  // ResizeObserver fire corrects it.
   globalShortcut.register('CommandOrControl+Alt+K', () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (mainWindow.isVisible()) {
       mainWindow.hide()
-    } else {
+    } else if (firstMeasureApplied) {
       mainWindow.show()
       mainWindow.focus()
     }
