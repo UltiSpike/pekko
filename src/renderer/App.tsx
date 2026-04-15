@@ -61,7 +61,7 @@ export default function App() {
   useAutoResizeWindow(appRef, !shuttingDown)
 
   const activeMode = useMemo(() => {
-    if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb, customArcadeEnabled ?? false)
+    if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb, customArcadeEnabled)
     return MODES.find(m => m.id === mode) ?? MODES[0]
   }, [mode, customStyle, customBed, customBedGainDb, customArcadeEnabled])
 

@@ -183,6 +183,9 @@ const STYLE: Record<StyleLevel, ModeStyle> = {
     lowShelfDb: 5.0,
     wetMix: 0.18,
   },
+  // "Rush" — bright, dry, light body. Leaves 180Hz headroom for arcade overlay kick,
+  // keeps 14kHz air open so hi-hat overlay cuts through. intensityLocked so combo
+  // stays the sole escalation axis; per-key velocity doesn't double-count energy.
   rush: {
     pitchJitter: 0.010,
     volumeJitter: 0.05,
