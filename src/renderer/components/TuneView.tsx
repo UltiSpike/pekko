@@ -58,6 +58,8 @@ interface Props {
   onBedChange: (b: BedType) => void
   onBedGainChange: (db: number) => void
   onStyleChange: (style: ModeStyle) => void
+  arcadeEnabled: boolean
+  onArcadeEnabledChange: (v: boolean) => void
   onResetMode: () => void
 
   onClose: () => void
@@ -73,7 +75,9 @@ export default function TuneView({
   presetDsp, effectiveDsp, dspOverride, onSwitchDspChange, onResetSwitchDsp,
   modeName, isCustomMode,
   bed, bedGainDb, style,
-  onBedChange, onBedGainChange, onStyleChange, onResetMode,
+  onBedChange, onBedGainChange, onStyleChange,
+  arcadeEnabled, onArcadeEnabledChange,
+  onResetMode,
   onClose,
 }: Props) {
   const [tab, setTab] = useState<Tab>('switch')
@@ -305,6 +309,21 @@ export default function TuneView({
               disabled={!isCustomMode}
               onChange={(v) => patchStyle({ volumeJitter: v })}
             />
+
+            <div className={`slider-row${!isCustomMode ? ' disabled' : ''}`}>
+              <span className="slider-label">Arcade feedback</span>
+              <div style={{ gridColumn: '2 / span 2', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={arcadeEnabled}
+                  disabled={!isCustomMode}
+                  onChange={(e) => onArcadeEnabledChange(e.target.checked)}
+                />
+                <span className="slider-value" style={{ fontSize: '0.72rem', opacity: 0.6 }}>
+                  Combo-driven overlay · tray pulse · built for sprints
+                </span>
+              </div>
+            </div>
           </>
         )}
       </div>

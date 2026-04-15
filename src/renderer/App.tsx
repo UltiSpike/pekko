@@ -227,6 +227,11 @@ export default function App() {
     persistCustom(customBed, db, customStyle, customArcadeEnabled)
   }, [customBed, customStyle, customArcadeEnabled, persistCustom])
 
+  const handleCustomArcadeEnabledChange = useCallback((enabled: boolean) => {
+    setCustomArcadeEnabled(enabled)
+    persistCustom(customBed, customBedGainDb, customStyle, enabled)
+  }, [customBed, customBedGainDb, customStyle, persistCustom])
+
   const resetCustom = useCallback(() => {
     const bed = DEFAULT_CUSTOM_BED
     const gain = DEFAULT_CUSTOM_BED_GAIN_DB
@@ -423,6 +428,8 @@ export default function App() {
             onBedChange={handleCustomBedChange}
             onBedGainChange={handleCustomBedGainChange}
             onStyleChange={handleCustomStyleChange}
+            arcadeEnabled={customArcadeEnabled}
+            onArcadeEnabledChange={handleCustomArcadeEnabledChange}
             onResetMode={resetCustom}
             onClose={() => handleTuningChange(false)}
           />
