@@ -1,5 +1,7 @@
 import { getKeyPan } from '@shared/key-positions'
 import { Mode, ModeStyle, getMode, DEFAULT_MODE_ID, SwitchDsp, DEFAULT_SWITCH_DSP, dbToGain } from '@shared/modes'
+import { ArcadeOverlayLayer } from './arcade/ArcadeOverlayLayer.ts'
+import { ArcadeHudController } from './arcade/ArcadeHudController.ts'
 
 interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
 interface MultiPack {
@@ -29,6 +31,9 @@ export class AudioEngine {
   private lastVariant = -1
   private pool: VoiceSlot[] = []
   private activeVoices = 0
+
+  private overlayLayer = new ArcadeOverlayLayer()
+  private hudController = new ArcadeHudController()
 
   // #3: Typing intensity model
   private lastKeyTime = 0
@@ -193,7 +198,9 @@ export class AudioEngine {
   // === Mode switching — applies style atomically (no bed) ===
   setMode(modeOrId: string | Mode) {
     const mode = typeof modeOrId === 'string' ? getMode(modeOrId) : modeOrId
+    const prevArcade = this.currentMode.arcadeEnabled
     this.currentMode = mode
+
     if (this.ctx && this.airLPF && this.highShelf && this.lowShelf && this.wetGain) {
       const now = this.ctx.currentTime
       const rampEnd = now + 0.3
@@ -207,7 +214,30 @@ export class AudioEngine {
       rampParam(this.lowShelf.gain, mode.style.lowShelfDb)
       rampParam(this.wetGain.gain, mode.style.wetMix)
     }
-    console.log(`[Audio] mode=${mode.id} style=airLPF ${mode.style.airLpfHz}Hz jitter=${mode.style.pitchJitter}`)
+
+    // Arcade overlay + HUD activation based on arcadeEnabled flip
+    if (mode.arcadeEnabled && !prevArcade) {
+      this.activateArcade()
+    } else if (!mode.arcadeEnabled && prevArcade) {
+      this.deactivateArcade()
+    }
+
+    console.log(`[Audio] mode=${mode.id} arcade=${mode.arcadeEnabled}`)
+  }
+
+  private async activateArcade(): Promise<void> {
+    if (!this.ctx) return
+    await this.overlayLayer.activate(this.ctx, {
+      onStageChange: (stage, combo) => this.hudController.onStageChange(stage, combo),
+      onPerfect:     () => this.hudController.onPerfect(),
+      onReset:       () => this.hudController.onReset(),
+    })
+    this.hudController.activate()
+  }
+
+  private deactivateArcade(): void {
+    this.overlayLayer.deactivate()
+    this.hudController.deactivate()
   }
 
   // === #3: Typing intensity model ===
@@ -234,6 +264,14 @@ export class AudioEngine {
   // === #5: Adaptive volume — decays during sustained typing ===
   private updateAdaptiveVolume() {
     const now = performance.now()
+
+    // Rush / Custom+arcade: fatigue decay is dropped per spec §7 (sprint mode).
+    if (this.currentMode.arcadeEnabled) {
+      this.adaptiveMultiplier = 1.0
+      this.typingStartTime = 0
+      this.lastAdaptiveUpdate = now
+      return
+    }
 
     if (now - this.lastKeyTime > 3000) {
       // Pause > 3 seconds — reset to full volume
@@ -452,6 +490,8 @@ export class AudioEngine {
       source.start(playTime)
       source.stop(playTime + dur)
       source.onended = () => this.releaseSlot(slot)
+      // Hold-repeat must not trigger arcade overlay / combo (spec §4).
+      // This `return` prevents fall-through to the overlay hook at method end.
       return
     }
 
@@ -531,6 +571,14 @@ export class AudioEngine {
     source.start(playTime, offsetJitter)
     source.stop(playTime + dur)
     source.onended = () => this.releaseSlot(slot)
+
+    // === Arcade overlay hook ===
+    // Only on keydown (not keyup). playTime identical to main source's — zero
+    // perceived latency offset vs the axis click.
+    if (type === 'down' && this.currentMode.arcadeEnabled) {
+      const nowMs = performance.now()
+      this.overlayLayer.onKeydown(nowMs, playTime)
+    }
   }
 
   private pickVariant(variants: AudioBuffer[]): AudioBuffer | undefined {
@@ -607,6 +655,9 @@ export class AudioEngine {
 
   // --- Cleanup (prevents memory leaks) ---
   destroy() {
+    // Tear down arcade first so overlay voices / swell don't linger when main pool releases
+    this.deactivateArcade()
+
     // Stop all active sources
     for (const slot of this.pool) {
       if (slot.source) {
