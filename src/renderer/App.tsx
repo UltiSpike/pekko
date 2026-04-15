@@ -302,7 +302,8 @@ export default function App() {
   ].filter(Boolean).join(' ')
 
   return (
-    <div className={appCls} ref={appRef}>
+    <div className={appCls}>
+      <div className="app-body" ref={appRef}>
       {/* Top plate — help button, status LED */}
       <div className="top-plate">
         <div className="help-wrap">
@@ -412,6 +413,7 @@ export default function App() {
         </>
       )}
       </>}
+      </div>
     </div>
   )
 }

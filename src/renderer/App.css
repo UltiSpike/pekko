@@ -235,9 +235,6 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   width: 100%;
   min-height: 100vh;
   background: var(--chassis);
-  display: flex;
-  flex-direction: column;
-  padding: 0 var(--s-6) var(--s-5);
   font-family: var(--font);
   font-size: 12px;
   color: var(--ink-1);
@@ -246,6 +243,17 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   -webkit-app-region: drag;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+}
+
+/* The measurement target. Natural height based on children — what the
+   auto-resize hook observes. Keeps the flex-column layout and chassis
+   padding that used to live on .app; .app is now just the chrome shell. */
+.app-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--s-6) var(--s-5);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ONYX v2 — Warmup. 920ms total. Chassis ink fades in 0→180; hairlines settle
