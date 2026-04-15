@@ -565,6 +565,33 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   opacity: 0.65;
   margin: var(--s-3) 0 var(--s-2);
 }
+
+/* ONYX v2.5 — help-panel readout strip. Diagnostic info, no action.
+   Mirrors a Nagra-style front-panel status: quiet, tabular, always there. */
+.help-readout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.help-readout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.help-readout-label {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.65;
+}
+.help-readout-value {
+  color: var(--ink-2);
+  letter-spacing: 0.06em;
+}
 .finish-auto:hover { color: var(--ink-1); }
 .finish-auto.on {
   color: var(--interactive);

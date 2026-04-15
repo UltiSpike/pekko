@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { Finish, FINISHES } from '@shared/types'
+import type { OutputInfo } from '../hooks/useAudioEngine'
 
 interface Props {
   finish: Finish
   onFinishChange: (f: Finish) => void
+  outputInfo: OutputInfo | null
   onClose: () => void
 }
 
@@ -21,7 +23,7 @@ const SHORTCUTS: { keys: string; use: string }[] = [
 // ONYX v2.2 — Help panel as "service mode" (no shadow / no blur — same chassis,
 // same hairlines, just different content). Finish picker grouped Auto / Dark / Light
 // to cut Hick's Law load.
-export default function HelpPanel({ finish, onFinishChange, onClose }: Props) {
+export default function HelpPanel({ finish, onFinishChange, outputInfo, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<Element | null>(null)
 
@@ -138,6 +140,21 @@ export default function HelpPanel({ finish, onFinishChange, onClose }: Props) {
               {f.name}
             </button>
           ))}
+        </div>
+      </div>
+
+      <hr className="help-divider" />
+
+      {/* Instrument readout — diagnostic info, not actionable. Style mirrors a
+          rack-unit front-panel status strip (Nagra: `IN 48k · OUT 48k`). */}
+      <div className="help-readout">
+        <div className="help-readout-row">
+          <span className="help-readout-label">Output</span>
+          <span className="help-readout-value">
+            {outputInfo
+              ? `${outputInfo.latencyMs}ms · ${outputInfo.isBluetooth ? 'Bluetooth' : 'Wired'}`
+              : '—'}
+          </span>
         </div>
       </div>
     </div>

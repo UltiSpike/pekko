@@ -68,7 +68,7 @@ export default function App() {
     [activeProfileObj, overrideForActive]
   )
 
-  const { bluetoothWarning, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode, effectiveDsp)
+  const { outputInfo, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode, effectiveDsp)
 
   // Reveal meta line briefly after keyboard navigation
   const flashMeta = useCallback(() => {
@@ -233,9 +233,10 @@ export default function App() {
   const activeIndex = profiles.findIndex(p => p.id === activeProfile)
   const typeBadge = activeData?.type?.toUpperCase()
   const isHQ = activeProfile.startsWith('cherrymx-') || activeProfile.startsWith('topre-purple') || activeProfile === 'nk-cream'
-  // warn = anything that should surface inline. Hides DSP arc / ladder / fader
-  // until resolved so the user sees the problem AND its recovery action front-and-center.
-  const hasWarning = !hasPermission || bluetoothWarning
+  // Warn surfaces the problem inline (replaces switch-desc). Only permission
+  // gets this treatment — Bluetooth latency is an info-level readout shown in
+  // the help panel, not a warning (v2.5).
+  const hasWarning = !hasPermission
 
   const cycleProfile = useCallback((dir: number) => {
     if (profiles.length === 0 || activeIndex === -1) return
@@ -312,7 +313,6 @@ export default function App() {
             active={typingActive && soundEnabled}
             muted={!soundEnabled}
             needsPermission={!hasPermission}
-            bluetoothWarning={bluetoothWarning}
             finishName={FINISHES.find(f => f.id === finish)?.name ?? finish}
           />
         </div>
@@ -322,6 +322,7 @@ export default function App() {
         <HelpPanel
           finish={finish}
           onFinishChange={handleFinishChange}
+          outputInfo={outputInfo}
           onClose={() => setHelpOpen(false)}
         />
       )}
@@ -352,27 +353,16 @@ export default function App() {
             {!isTuning && !hasWarning && <div className="switch-desc">{activeData.description}</div>}
             {!isTuning && hasWarning && (
               <div className="warn-panel" role="alert">
-                {!hasPermission ? (
-                  <>
-                    <div className="warn-panel-title">Accessibility permission required</div>
-                    <div className="warn-panel-body">
-                      Pekko needs Accessibility access to detect keystrokes. No keystroke content is read — only key codes.
-                    </div>
-                    <button
-                      className="warn-panel-action"
-                      onClick={() => hasApi && window.api.requestPermissions()}
-                    >
-                      Grant access
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="warn-panel-title">Bluetooth output detected</div>
-                    <div className="warn-panel-body">
-                      Wired output is recommended for the lowest sound latency.
-                    </div>
-                  </>
-                )}
+                <div className="warn-panel-title">Accessibility permission required</div>
+                <div className="warn-panel-body">
+                  Pekko needs Accessibility access to detect keystrokes. No keystroke content is read — only key codes.
+                </div>
+                <button
+                  className="warn-panel-action"
+                  onClick={() => hasApi && window.api.requestPermissions()}
+                >
+                  Grant access
+                </button>
               </div>
             )}
           </>

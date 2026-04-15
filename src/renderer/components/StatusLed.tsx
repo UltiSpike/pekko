@@ -4,23 +4,23 @@ interface Props {
   active: boolean             // currently typing
   muted: boolean              // sound disabled
   needsPermission: boolean    // shape-encoded as `!` glyph (panel handles inline error)
-  bluetoothWarning: boolean   // shape-encoded as `!` glyph (panel handles inline)
   finishName: string
 }
 
-// ONYX v2.2 — Status LED. Always pilot-lit (--led-dim @ idle).
+// ONYX v2.5 — Status LED. Always pilot-lit (--led-dim @ idle).
 // State encoded in BOTH color and shape (color-blind safe):
 //   idle    → solid disc, --led-dim
 //   active  → solid disc, --led-on, single 200ms pulse
 //   muted   → hollow ring, --led-mute, slow breathe
 //   warn    → 12px disc with `!` glyph (no blink — seizure-adjacent)
-// Permission / BT messages live in the inline warn panel (App.tsx). The LED
-// is a redundant channel: a quick-glance signal that something needs attention.
+//
+// Warn = permission only. Bluetooth latency is an info readout in the help
+// panel (v2.5 — previously also triggered warn, felt paternalistic).
 export default function StatusLed({
-  active, muted, needsPermission, bluetoothWarning, finishName,
+  active, muted, needsPermission, finishName,
 }: Props) {
   const [open, setOpen] = useState(false)
-  const hasWarning = needsPermission || bluetoothWarning
+  const hasWarning = needsPermission
 
   // Pulse on each typing activation. CSS animation is one-shot via key remount.
   const [pulseKey, setPulseKey] = useState(0)
@@ -40,10 +40,9 @@ export default function StatusLed({
         className={cls}
         onClick={() => setOpen((o) => !o)}
         aria-label={
-          needsPermission   ? 'Permission required (see panel)' :
-          bluetoothWarning  ? 'Bluetooth detected (see panel)' :
-          muted             ? 'Sound muted' :
-          active            ? 'Sound active' : 'Idle'
+          needsPermission ? 'Permission required (see panel)' :
+          muted           ? 'Sound muted' :
+          active          ? 'Sound active' : 'Idle'
         }
       />
       {open && !hasWarning && (

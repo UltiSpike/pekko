@@ -29,8 +29,13 @@ declare global {
   }
 }
 
+export interface OutputInfo {
+  latencyMs: number
+  isBluetooth: boolean
+}
+
 export function useAudioEngine(activeProfileId: string, volume: number, mode: Mode, switchDsp: SwitchDsp) {
-  const [bluetoothWarning, setBluetoothWarning] = useState(false)
+  const [outputInfo, setOutputInfo] = useState<OutputInfo | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [wpm, setWpm] = useState(0)
   const [typingActive, setTypingActive] = useState(false)
@@ -56,12 +61,14 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
       setSoundEnabled(enabled)
     })
 
-    // Bluetooth latency check
+    // Output latency probe — informational only. Reported as a silent readout
+    // in the help panel (no warn state). v2.5 reverted the warn-level treatment
+    // because the warning read as paternalistic for users on Bluetooth by choice.
     const checkBt = setTimeout(() => {
-      const { isBluetooth, latencyMs } = audioEngine.checkOutputLatency()
-      if (isBluetooth) {
-        console.warn(`[Audio] High latency: ${latencyMs}ms (Bluetooth?)`)
-        setBluetoothWarning(true)
+      const info = audioEngine.checkOutputLatency()
+      setOutputInfo(info)
+      if (info.isBluetooth) {
+        console.info(`[Audio] Output latency ${info.latencyMs}ms (likely Bluetooth)`)
       }
     }, 3000)
 
@@ -97,5 +104,5 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
     audioEngine.applySwitchDsp(switchDsp)
   }, [switchDsp])
 
-  return { bluetoothWarning, soundEnabled, wpm, typingActive }
+  return { outputInfo, soundEnabled, wpm, typingActive }
 }
