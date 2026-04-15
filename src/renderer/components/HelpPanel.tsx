@@ -34,7 +34,7 @@ export default function HelpPanel({ finish, onFinishChange, outputInfo, onClose 
     const first = ref.current?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])')
     first?.focus()
     return () => {
-      // Restore focus to the triggering button (typically .slash-notch) on unmount
+      // Restore focus to the triggering button (typically .slash-key) on unmount
       if (triggerRef.current instanceof HTMLElement) triggerRef.current.focus()
     }
   }, [])
@@ -67,7 +67,7 @@ export default function HelpPanel({ finish, onFinishChange, outputInfo, onClose 
       if (!ref.current) return
       if (ref.current.contains(e.target as Node)) return
       const target = e.target as HTMLElement
-      if (target.closest('.slash-notch')) return
+      if (target.closest('.slash-key')) return
       onClose()
     }
     window.addEventListener('mousedown', onDown)
@@ -152,7 +152,7 @@ export default function HelpPanel({ finish, onFinishChange, outputInfo, onClose 
           <span className="help-readout-label">Output</span>
           <span className="help-readout-value">
             {outputInfo
-              ? `${outputInfo.latencyMs}ms · ${outputInfo.isBluetooth ? 'Bluetooth' : 'Wired'}`
+              ? `${outputInfo.latencyMs}ms · ${outputInfo.isBluetooth ? 'BT' : 'WIRED'}`
               : '—'}
           </span>
         </div>
