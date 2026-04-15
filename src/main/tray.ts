@@ -5,8 +5,19 @@ import { getSettings, setProfile, setVolume, setFinish, setUiSounds, setHoldRepe
 import { setHoldRepeat as setKeyboardHoldRepeat } from './keyboard'
 import { Profile, FINISHES, Finish } from '../shared/types'
 
+export type ArcadeHudState =
+  | { kind: 'idle' }
+  | { kind: 'active'; stage: 'engaged' | 'stacking' | 'flow' | 'zone'; perfect: boolean }
+
 const ROOT = path.join(__dirname, '..', '..')
 let tray: Tray | null = null
+let defaultTemplateImg: Electron.NativeImage | null = null
+let rushBaseImg: Electron.NativeImage | null = null
+let rushBrightImg: Electron.NativeImage | null = null
+let rushPerfectImg: Electron.NativeImage | null = null
+let pulseTimer: ReturnType<typeof setInterval> | null = null
+let perfectTimer: ReturnType<typeof setTimeout> | null = null
+let pulseAlt = false
 let win: BrowserWindow | null = null
 let _soundEnabled = true
 // Gate for pre-measurement race — see index.ts createWindow comment. The tray
@@ -139,10 +150,67 @@ function createTrayIcon(): Tray {
   try {
     const img = nativeImage.createFromPath(iconPath)
     img.setTemplateImage(true)
+    defaultTemplateImg = img
     return new Tray(img)
   } catch {
     return new Tray(nativeImage.createEmpty())
   }
+}
+
+function loadRushIcons(): void {
+  if (rushBaseImg) return
+  try {
+    rushBaseImg = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray-rush', 'rush-base.png'))
+    rushBrightImg = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray-rush', 'rush-bright.png'))
+    rushPerfectImg = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray-rush', 'rush-perfect.png'))
+  } catch (err) {
+    console.error('[Pekko] rush icons load failed:', err)
+  }
+}
+
+export function updateArcadeHud(state: ArcadeHudState): void {
+  if (!tray) return
+  loadRushIcons()
+
+  if (state.kind === 'active' && state.perfect && rushPerfectImg) {
+    if (perfectTimer) clearTimeout(perfectTimer)
+    tray.setImage(rushPerfectImg)
+    perfectTimer = setTimeout(() => {
+      applyBaseStage(state)
+    }, 200)
+    return
+  }
+
+  applyBaseStage(state)
+}
+
+function applyBaseStage(state: ArcadeHudState): void {
+  if (!tray) return
+
+  if (state.kind === 'idle' || !rushBaseImg || !rushBrightImg) {
+    if (pulseTimer) { clearInterval(pulseTimer); pulseTimer = null }
+    if (defaultTemplateImg) tray.setImage(defaultTemplateImg)
+    return
+  }
+
+  const { stage } = state
+  if (stage === 'engaged' || stage === 'stacking') {
+    if (pulseTimer) { clearInterval(pulseTimer); pulseTimer = null }
+    tray.setImage(stage === 'engaged' ? rushBaseImg : rushBrightImg)
+    return
+  }
+
+  // flow / zone — 2-frame pulse alternation
+  const intervalMs = stage === 'flow' ? 500 : 250  // flow: 2s/cycle, zone: 1s/cycle
+  if (pulseTimer) clearInterval(pulseTimer)
+  pulseAlt = false
+  pulseTimer = setInterval(() => {
+    pulseAlt = !pulseAlt
+    if (tray && rushBaseImg && rushBrightImg) {
+      tray.setImage(pulseAlt ? rushBrightImg : rushBaseImg)
+    }
+  }, intervalMs)
+  tray.setImage(rushBaseImg)
 }
 
 export function createTray(

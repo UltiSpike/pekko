@@ -5,7 +5,7 @@ import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, se
 import type { BedType, ModeStyle, SwitchDspOverride } from '../shared/modes'
 import type { Finish } from '../shared/types'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
-import { rebuildTrayMenu } from './tray'
+import { rebuildTrayMenu, updateArcadeHud, ArcadeHudState } from './tray'
 
 const ROOT = path.join(__dirname, '..', '..')
 
@@ -169,5 +169,11 @@ export function registerIpcHandlers(hooks: Hooks = {}): void {
     rebuildTrayMenu()
     hooks.onHoldRepeatChange?.(v)
     return true
+  })
+
+  // Arcade HUD — one-way fire-and-forget from renderer. No invoke/reply to
+  // avoid round-trip latency on the audio hot path.
+  ipcMain.on('update-arcade-hud', (_event, state: ArcadeHudState) => {
+    updateArcadeHud(state)
   })
 }

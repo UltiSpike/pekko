@@ -86,6 +86,8 @@ contextBridge.exposeInMainWorld('api', {
   resizeWindow:    (h: number)  => ipcRenderer.invoke('resize-window', h),
   setHelpOpen:     (open: boolean) => ipcRenderer.invoke('set-help-open', open),
   setHoldRepeat:   (enabled: boolean) => ipcRenderer.invoke('set-hold-repeat', enabled),
+  updateArcadeHud: (state: { kind: 'idle' } | { kind: 'active'; stage: 'engaged' | 'stacking' | 'flow' | 'zone'; perfect: boolean }) =>
+    ipcRenderer.send('update-arcade-hud', state),
   getSettings:       ()            => ipcRenderer.invoke('get-settings'),
   getProfiles:       ()            => ipcRenderer.invoke('get-profiles'),
   loadSoundPack:     (id: string)  => ipcRenderer.invoke('load-sound-pack', id),
