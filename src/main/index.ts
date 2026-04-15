@@ -4,7 +4,7 @@ import { startKeyboardListener, stopKeyboardListener } from './keyboard'
 import { registerIpcHandlers } from './ipc-handlers'
 import { createTray, setSoundEnabled } from './tray'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
-import { getSettings, getSettingsWithStaleGuard, recordClose } from './store'
+import { getSettings, recordClose } from './store'
 
 // Shutdown choreography — renderer plays a 400ms fade before main hides the
 // window. Slightly over the animation duration to let the keyframe finish.
@@ -15,16 +15,15 @@ const ROOT = path.join(__dirname, '..', '..')
 const WINDOW_WIDTH = 360
 const WINDOW_WIDTH_MIN = 320
 const WINDOW_WIDTH_MAX = 520
-const WINDOW_HEIGHT_CLOSED = 480
-const WINDOW_HEIGHT_OPEN = 720
-// Free-resize bounds — user can drag both axes.
-// Drawer toggle still jumps to the default closed/open heights; user can
-// resize on top from there.
-const WINDOW_HEIGHT_MIN = 400
-const WINDOW_HEIGHT_MAX = 900
+// Auto-resize clamp — window height follows measured content within these bounds.
+// Also used as the BrowserWindow min/max to cap user-initiated drag-resize.
+const MIN_H = 420
+const MAX_H = 760
 
 let mainWindow: BrowserWindow | null = null
 let soundEnabled = true
+let isHelpOpen = false
+let firstMeasureApplied = false
 
 function isDev() {
   return !app.isPackaged
@@ -32,17 +31,18 @@ function isDev() {
 
 function createWindow() {
   const iconPath = path.join(ROOT, 'assets', 'icons', 'app-icon.icns')
-  // ONYX v2.2 stale guard: if last close > 1 hour ago, isTuning is force-cleared.
-  const initialHeight = getSettingsWithStaleGuard().isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED
 
+  // Provisional boot height — window stays hidden until the renderer's first
+  // resize IPC arrives (see 'first-measure-show' gate below). User never sees
+  // this size.
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
-    height: initialHeight,
+    height: MIN_H,
     minWidth: WINDOW_WIDTH_MIN,
     maxWidth: WINDOW_WIDTH_MAX,
-    minHeight: WINDOW_HEIGHT_MIN,
-    maxHeight: WINDOW_HEIGHT_MAX,
-    show: true,
+    minHeight: MIN_H,
+    maxHeight: MAX_H,
+    show: false,
     resizable: true,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#00000000',
@@ -71,13 +71,13 @@ function createWindow() {
     mainWindow = null
   })
 
-  // Hide on blur — popover behavior. Suspended while the tune drawer is open
-  // so a misclick can't destroy the user's mid-tune context.
-  // ONYX v2.2 — emit 'before-hide' so renderer can play 400ms shutdown fade
-  // before the window actually disappears.
+  // Hide on blur — popover behavior. Suspended while tune drawer OR help is
+  // open so a misclick can't destroy the user's reading/tuning context.
+  // (v3: suppression extended from drawer-only to drawer-or-help.)
   mainWindow.on('blur', () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (getSettings().isTuning) return
+    if (isHelpOpen) return
     recordClose()
     mainWindow.webContents.send('before-hide')
     setTimeout(() => {
@@ -86,13 +86,6 @@ function createWindow() {
       }
     }, SHUTDOWN_MS)
   })
-}
-
-function setWindowTuning(isTuning: boolean): void {
-  if (!mainWindow || mainWindow.isDestroyed()) return
-  const targetHeight = isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED
-  const [w] = mainWindow.getSize()
-  mainWindow.setSize(w, targetHeight, true)
 }
 
 app.on('ready', () => {
@@ -125,7 +118,21 @@ app.on('ready', () => {
     pollPermissionAndStart()
   }
 
-  registerIpcHandlers({ onTuningChange: setWindowTuning })
+  registerIpcHandlers({
+    onResize: (h) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      const clamped = Math.max(MIN_H, Math.min(MAX_H, Math.round(h)))
+      const [w] = mainWindow.getSize()
+      mainWindow.setBounds({ width: w, height: clamped }, /* animate */ firstMeasureApplied)
+      if (!firstMeasureApplied) {
+        firstMeasureApplied = true
+        mainWindow.show()
+      }
+    },
+    onHelpOpenChange: (open) => {
+      isHelpOpen = open
+    }
+  })
 
   // Global: ⇧⌘K mute toggle
   globalShortcut.register('CommandOrControl+Shift+K', () => {
