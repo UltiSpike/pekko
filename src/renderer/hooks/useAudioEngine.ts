@@ -25,6 +25,8 @@ declare global {
       setVolume: (v: number) => Promise<boolean>
       checkPermissions: () => Promise<boolean>
       requestPermissions: () => Promise<boolean>
+      resizeWindow: (h: number) => Promise<boolean>
+      setHelpOpen: (open: boolean) => Promise<boolean>
     }
   }
 }
