@@ -53,6 +53,7 @@ export default function App() {
   const [shuttingDown, setShuttingDown] = useState(false)
   const warmupPlayedRef = useRef(false)
   const [uiSounds, setUiSounds] = useState(false)
+  const [holdRepeat, setHoldRepeatState] = useState(false)
   const lastSoundEnabledRef = useRef(true)
   const metaTimerRef = useRef<number | null>(null)
   const appRef = useRef<HTMLDivElement | null>(null)
@@ -89,6 +90,7 @@ export default function App() {
       if (typeof s.isTuning === 'boolean') setIsTuning(s.isTuning)
       if (s.finish) setFinish(s.finish)
       if (typeof s.uiSounds === 'boolean') setUiSounds(s.uiSounds)
+      if (typeof s.holdRepeat === 'boolean') setHoldRepeatState(s.holdRepeat)
       if (s.customBed) setCustomBed(s.customBed)
       if (typeof s.customBedGainDb === 'number') setCustomBedGainDb(s.customBedGainDb)
       if (s.customStyle) setCustomStyle(s.customStyle)
@@ -143,6 +145,11 @@ export default function App() {
     window.api.onUiSoundsChanged((enabled) => setUiSounds(enabled))
   }, [flashMeta])
 
+  useEffect(() => {
+    if (!hasApi) return
+    window.api.onHoldRepeatChanged?.(setHoldRepeatState)
+  }, [])
+
   // UI sound: mute toggle. Driven by the soundEnabled signal coming from
   // useAudioEngine — fires once per state change, after Warmup completes.
   useEffect(() => {
@@ -191,6 +198,11 @@ export default function App() {
       window.setTimeout(() => setHeroBlackout(false), 200)
     })
     if (hasApi) await window.api.setFinish(next)
+  }, [])
+
+  const handleHoldRepeatChange = useCallback(async (next: boolean) => {
+    setHoldRepeatState(next)
+    if (hasApi) await window.api.setHoldRepeat(next)
   }, [])
 
   const persistCustom = useCallback(async (bed: BedType, bedGainDb: number, style: ModeStyle) => {
@@ -332,6 +344,8 @@ export default function App() {
           finish={finish}
           onFinishChange={handleFinishChange}
           outputInfo={outputInfo}
+          holdRepeat={holdRepeat}
+          onHoldRepeatChange={handleHoldRepeatChange}
           onClose={() => setHelpOpen(false)}
         />
       )}

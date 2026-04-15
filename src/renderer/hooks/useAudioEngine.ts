@@ -12,7 +12,9 @@ declare global {
       onFinishChanged: (cb: (finish: string) => void) => void
       onBeforeHide: (cb: () => void) => void
       onUiSoundsChanged: (cb: (enabled: boolean) => void) => void
+      onHoldRepeatChanged: (cb: (enabled: boolean) => void) => void
       setUiSounds: (enabled: boolean) => Promise<boolean>
+      setHoldRepeat: (enabled: boolean) => Promise<boolean>
       setMode: (m: string) => Promise<boolean>
       setIsTuning: (t: boolean) => Promise<boolean>
       setFinish: (f: string) => Promise<boolean>

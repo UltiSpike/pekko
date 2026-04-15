@@ -571,6 +571,61 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   color: var(--ink-2);
   letter-spacing: 0.06em;
 }
+
+/* TYPING toggle — two-segment chip; matches .slash-key visual language but
+   wider, with a clear hairline divider between segments. */
+.repeat-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.repeat-toggle-label {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--ink-1);
+}
+.repeat-toggle-segments {
+  display: inline-flex;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.repeat-toggle-seg {
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--ink-2);
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+.repeat-toggle-seg + .repeat-toggle-seg {
+  border-left: 1px solid var(--hairline);
+}
+.repeat-toggle-seg:hover { color: var(--interactive); }
+.repeat-toggle-seg.on {
+  color: var(--interactive);
+  background: var(--interactive-soft);
+}
+.repeat-toggle-seg:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+.repeat-toggle-caption {
+  margin-top: var(--s-2);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  opacity: 0.7;
+}
 .finish-auto:hover { color: var(--ink-1); }
 .finish-auto.on {
   color: var(--interactive);

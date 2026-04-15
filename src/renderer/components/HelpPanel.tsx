@@ -6,6 +6,8 @@ interface Props {
   finish: Finish
   onFinishChange: (f: Finish) => void
   outputInfo: OutputInfo | null
+  holdRepeat: boolean
+  onHoldRepeatChange: (enabled: boolean) => void
   onClose: () => void
 }
 
@@ -17,13 +19,14 @@ const SHORTCUTS: { keys: string; use: string }[] = [
   { keys: '⌘?',      use: 'This panel'    },
   { keys: 'Esc',     use: 'Close drawer'  },
   { keys: '⇧⌘K',     use: 'Mute'          },
+  { keys: '⇧⌘R',     use: 'Hold-repeat'   },
   { keys: '⌥⌘K',     use: 'Toggle window' },
 ]
 
 // ONYX v2.2 — Help panel as "service mode" (no shadow / no blur — same chassis,
 // same hairlines, just different content). Finish picker grouped Auto / Dark / Light
 // to cut Hick's Law load.
-export default function HelpPanel({ finish, onFinishChange, outputInfo, onClose }: Props) {
+export default function HelpPanel({ finish, onFinishChange, outputInfo, holdRepeat, onHoldRepeatChange, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<Element | null>(null)
 
@@ -96,6 +99,30 @@ export default function HelpPanel({ finish, onFinishChange, outputInfo, onClose 
             </div>
           ))}
         </div>
+      </div>
+
+      <hr className="help-divider" />
+
+      <div>
+        <div className="help-section-title">Typing</div>
+        <div className="repeat-toggle">
+          <span className="repeat-toggle-label">Hold-repeat clicks</span>
+          <div className="repeat-toggle-segments" role="group" aria-label="Hold-repeat clicks">
+            <button
+              type="button"
+              className={`repeat-toggle-seg${holdRepeat ? ' on' : ''}`}
+              aria-pressed={holdRepeat}
+              onClick={() => onHoldRepeatChange(true)}
+            >ON</button>
+            <button
+              type="button"
+              className={`repeat-toggle-seg${!holdRepeat ? ' on' : ''}`}
+              aria-pressed={!holdRepeat}
+              onClick={() => onHoldRepeatChange(false)}
+            >OFF</button>
+          </div>
+        </div>
+        <div className="repeat-toggle-caption">⌫  ⌦  ←  →  ↑  ↓</div>
       </div>
 
       <hr className="help-divider" />
