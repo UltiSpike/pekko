@@ -59,6 +59,9 @@ export class ArcadeHudController {
     if (this.rafHandle !== null) return
     this.rafHandle = requestAnimationFrame(() => {
       this.rafHandle = null
+      // If deactivate() ran while this rAF was queued, do nothing — deactivate
+      // already sent the final idle state synchronously.
+      if (!this.activated) return
       if (this.pending === null) return
       const key = JSON.stringify(this.pending)
       if (key !== this.lastSent) {

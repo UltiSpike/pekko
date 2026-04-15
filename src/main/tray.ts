@@ -187,6 +187,11 @@ export function updateArcadeHud(state: ArcadeHudState): void {
 function applyBaseStage(state: ArcadeHudState): void {
   if (!tray) return
 
+  // Any pending PERFECT flash restore is obsolete the moment a new base state
+  // is applied — otherwise a late timeout can restore a stale active icon
+  // after the user has already switched to another mode.
+  if (perfectTimer) { clearTimeout(perfectTimer); perfectTimer = null }
+
   if (state.kind === 'idle' || !rushBaseImg || !rushBrightImg) {
     if (pulseTimer) { clearInterval(pulseTimer); pulseTimer = null }
     if (defaultTemplateImg) tray.setImage(defaultTemplateImg)

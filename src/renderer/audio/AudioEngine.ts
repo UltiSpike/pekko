@@ -199,6 +199,7 @@ export class AudioEngine {
   setMode(modeOrId: string | Mode) {
     const mode = typeof modeOrId === 'string' ? getMode(modeOrId) : modeOrId
     const prevArcade = this.currentMode.arcadeEnabled
+    const prevModeId = this.currentMode.id
     this.currentMode = mode
 
     if (this.ctx && this.airLPF && this.highShelf && this.lowShelf && this.wetGain) {
@@ -220,6 +221,10 @@ export class AudioEngine {
       this.activateArcade()
     } else if (!mode.arcadeEnabled && prevArcade) {
       this.deactivateArcade()
+    } else if (prevArcade && mode.arcadeEnabled && prevModeId !== mode.id) {
+      // Same arcade=true, different mode — per spec §4 "Mode 切换即新会话".
+      // Reset combo / per-press layers / swell so the new mode starts clean.
+      this.overlayLayer.onReset()
     }
 
     console.log(`[Audio] mode=${mode.id} arcade=${mode.arcadeEnabled}`)
