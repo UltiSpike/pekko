@@ -147,28 +147,35 @@ Net vertical reclaim: ~24 px, absorbed by increased breathing above the arc (no 
 
 > The tray has two roles — **presence** (resting) and **rhythm** (typing). Presence = static; rhythm = per-keystroke, not timer-based. Timer-based pulses at 2–4 Hz always lag fast typing; the only rhythm that scales with the typist is the one driven directly by keydown events.
 
-**Two frames · Single Amber Disc, Size Pulse:**
+**Two frames · Keycap Silhouette, Outline ↔ Filled:**
 
-One element. One shape. Amber filled disc. The whole disc grows outward on keydown and shrinks back at idle. No concentric rings, no center dots, no composite layers.
+Rounded square (keycap top-view). Idle = amber stroke-only (unlit cap visible); On = amber filled (cap lit / pressed home). The outline→fill transition is the universal "this thing just received power" signifier, applied to a silhouette that unambiguously says "keyboard".
 
 Geometry (specified at 2x / 36 × 36 canvas; `sharp` downscales to 18 × 18 for 1x):
 
-| Frame | Shape | Radius @ 2x | Diameter @ 2x |
-|---|---|---|---|
-| Idle (`tray-icon.png`) | `#FFB347` filled disc, α 1.0 | 6 | 12 px (33 % of canvas) |
-| On (`tray-icon-on.png`) | `#FFB347` filled disc, α 1.0 | 11 | 22 px (61 % of canvas) |
+| Property | Idle (`tray-icon.png`) | On (`tray-icon-on.png`) |
+|---|---|---|
+| Rect at 2x | x=8, y=8, w=20, h=20 | same |
+| Corner radius @ 2x | 4 px | 4 px |
+| Stroke | `#FFB347` @ 0.85 α, 2.5 px | — (none) |
+| Fill | none | `#FFB347` solid |
 
-Both centered (cx=18, cy=18). On each fresh keydown, `setTrayTransient(onImg, 80)` swaps to the on frame; after 80 ms revert to idle.
+Both identical silhouette and position. On each fresh keydown, `setTrayTransient(onImg, 80)` swaps to the on frame; after 80 ms revert to idle.
 
-**Why single-disc size pulse is correct:**
+**Why keycap beats the radial-blob iterations:**
 
-- Prior iterations layered composites (ring + dot; core + halo ring). Both read as instrumentation — a coordinate marker or a gauge — not as a lamp. The "闪烁光芒" / "microscopic-glow breathing" feel requires ONE thing that is itself glowing and pulsing, not two things where one is "the shape" and one is "the decoration".
-- With a single disc, size change IS the event. Expanding outward = light emitting outward. Shrinking back = returning to rest.
-- The disc is always filled — the amber is always present; only its extent varies. That preserves menu-bar presence (never hollow, never blanks out) while making each keystroke a visible burst.
+Prior iterations (thin ring, ring+dot, core+halo, single-disc grow, amber disc grow) all converged on the same failure: radial-symmetric forms with single-parameter variation. Every menu-bar loading spinner, notification dot, and recording indicator uses that vocabulary. The shape said nothing about Pekko.
 
-At 10 Hz typing the disc oscillates between r=6 and r=11 ~10× per second — reads as the lamp literally flickering with the typist's rhythm.
+A rounded square at tray scale is Pekko's signature silhouette:
 
-**Color, not template.** Amber `#FFB347` (Pekko's `--led-on` default). `setTemplateImage()` NOT called — macOS renders with colors intact in both light and dark menu bars.
+- Specific — only keyboard apps use a keycap form
+- Mimetic — the outline→fill transition mirrors a backlit key receiving a strike
+- Chassis-aligned — OP-1 keys, mechanical keyboard caps, Teenage Engineering mark-making all use soft rounded squares
+- Scalable — silhouette reads clearly at both 18 × 18 and 36 × 36; no detail-density failure at 1x
+
+At 10 Hz typing, the keycap alternates outline ↔ filled ~10× per second — reads as "the lit key flickers with your rhythm", not as "a dot is pulsing".
+
+**Color, not template.** Amber `#FFB347` (Pekko's `--led-on` default, Graphite finish). `setTemplateImage()` NOT called — macOS renders with colors intact in both light and dark menu bars. Amber against white menu bar reads as warm pilot-lamp; against dark, as lit element.
 
 All four assets (`tray-icon.png`, `tray-icon@2x.png`, `tray-icon-on.png`, `tray-icon-on@2x.png`) generated from paired SVG sources via `sharp` during design pass.
 
