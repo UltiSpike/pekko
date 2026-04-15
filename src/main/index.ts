@@ -2,9 +2,9 @@ import { app, BrowserWindow, globalShortcut } from 'electron'
 import path from 'path'
 import { startKeyboardListener, stopKeyboardListener, setHoldRepeat as setKeyboardHoldRepeat } from './keyboard'
 import { registerIpcHandlers } from './ipc-handlers'
-import { createTray, setSoundEnabled } from './tray'
+import { createTray, setSoundEnabled, rebuildTrayMenu } from './tray'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
-import { getSettings, recordClose } from './store'
+import { getSettings, recordClose, setHoldRepeat } from './store'
 
 // Shutdown choreography — renderer plays a 400ms fade before main hides the
 // window. Slightly over the animation duration to let the keyframe finish.
@@ -164,7 +164,22 @@ app.on('ready', () => {
     }
   })
 
-  console.log('[Pekko] All systems go! (⇧⌘K mute · ⌥⌘K toggle window · T tune)')
+  // Global: ⇧⌘R toggle hold-repeat
+  const holdRepeatRegistered = globalShortcut.register('CommandOrControl+Shift+R', () => {
+    const next = !getSettings().holdRepeat
+    setHoldRepeat(next)
+    setKeyboardHoldRepeat(next)
+    rebuildTrayMenu()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('hold-repeat-changed', next)
+    }
+    console.log(`[Pekko] Hold-repeat ${next ? 'ON' : 'OFF'}`)
+  })
+  if (!holdRepeatRegistered) {
+    console.warn('[Pekko] ⇧⌘R could not be registered — another app holds it. Use the help panel toggle or tray menu instead.')
+  }
+
+  console.log('[Pekko] All systems go! (⇧⌘K mute · ⇧⌘R hold-repeat · ⌥⌘K toggle window · T tune)')
 })
 
 app.on('window-all-closed', () => {
