@@ -31,24 +31,30 @@
      Engraving tokens           → debossed text edges
    ============================================= */
 
-/* --- Basalt (default dark) — warm matte stone, Nagra / Bricasti --- */
+/* --- Basalt (default dark) — cool graphite stone, Nagra / Bricasti ---
+   v2.3: chassis shifted -5° hue toward blue-gray + interactive desaturated
+   further. v2.2's warm amber was reading "brown" over the whole panel when
+   LED + chips + focus all shared the same tone. */
 :root,
 :root[data-finish='auto'],
 :root[data-finish='basalt'] {
-  --chassis: rgba(20, 19, 15, 0.82);
-  --chassis-tint: #0E0D0B;
-  --ink-1: #EAE3D2;
-  --ink-2: #9A9187;
+  --chassis: rgba(18, 19, 21, 0.84);
+  --chassis-tint: #0C0D0F;
+  --ink-1: #E4E2DC;
+  --ink-2: #8F8E8A;
   --hairline: rgba(255, 255, 255, 0.10);
   --engrave-shadow: rgba(0, 0, 0, 0.45);
-  --engrave-highlight: rgba(255, 240, 220, 0.06);
+  --engrave-highlight: rgba(240, 240, 245, 0.06);
+  /* LED kept warm (it's the "powered indicator" — stays amber for personality) */
   --led-on: #FFB347;
   --led-dim: rgba(255, 179, 71, 0.35);
   --led-mute: #7A3529;
   --led-peak: #FF8547;
-  --interactive: #E59F40;
-  --interactive-soft: rgba(229, 159, 64, 0.14);
-  --focus-ring: #E59F40;
+  /* Interactive desaturated MUCH further — reads as "softly lit" buttons, not
+     saturated amber all over the panel. */
+  --interactive: #B0A894;
+  --interactive-soft: rgba(176, 168, 148, 0.14);
+  --focus-ring: #C8BEA6;
 }
 
 /* --- Bone (auto on light system) — warm paper, Muji / Crane --- */
@@ -464,21 +470,17 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   background: var(--interactive-soft);
 }
 
+/* ONYX v2.3 — Help panel is "service mode": it fills the rest of the chassis
+   content area (below top-plate) instead of floating over it. No shadow, no
+   blur, same surface — the chassis flips to a reference card. */
 .help-panel {
-  position: absolute;
-  top: 28px;
-  right: 0;
-  width: 300px;
-  max-height: calc(100vh - 80px);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  background: var(--chassis);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r);
-  padding: var(--s-4);
+  padding: var(--s-4) 0 var(--s-5);
   display: flex;
   flex-direction: column;
   gap: var(--s-4);
-  z-index: 30;
   animation: help-in 160ms cubic-bezier(0.32, 0.72, 0.24, 1);
 }
 

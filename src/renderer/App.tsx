@@ -313,16 +313,18 @@ export default function App() {
             bluetoothWarning={bluetoothWarning}
             finishName={FINISHES.find(f => f.id === finish)?.name ?? finish}
           />
-          {helpOpen && (
-            <HelpPanel
-              finish={finish}
-              onFinishChange={handleFinishChange}
-              onClose={() => setHelpOpen(false)}
-            />
-          )}
         </div>
       </div>
 
+      {helpOpen && (
+        <HelpPanel
+          finish={finish}
+          onFinishChange={handleFinishChange}
+          onClose={() => setHelpOpen(false)}
+        />
+      )}
+
+      {!helpOpen && <>
       {/* Mode chip */}
       <div className="mode-block">
         <button className="mode-nav" onClick={() => cycleMode(-1)} aria-label="Previous mode">{'\u2039'}</button>
@@ -375,7 +377,7 @@ export default function App() {
         ) : null}
       </div>
 
-      {!isTuning && !hasWarning && (
+      {!isTuning && (
         <>
           <DspWarmthArc wpm={wpm} active={typingActive} muted={!soundEnabled} />
           <LedLadder wpm={wpm} active={typingActive} muted={!soundEnabled} />
@@ -418,6 +420,7 @@ export default function App() {
           />
         </>
       )}
+      </>}
     </div>
   )
 }

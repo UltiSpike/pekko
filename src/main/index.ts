@@ -13,6 +13,8 @@ const SHUTDOWN_MS = 420
 const ROOT = path.join(__dirname, '..', '..')
 
 const WINDOW_WIDTH = 360
+const WINDOW_WIDTH_MIN = 340
+const WINDOW_WIDTH_MAX = 440
 const WINDOW_HEIGHT_CLOSED = 480
 const WINDOW_HEIGHT_OPEN = 720
 
@@ -31,8 +33,13 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: initialHeight,
+    minWidth: WINDOW_WIDTH_MIN,
+    maxWidth: WINDOW_WIDTH_MAX,
+    // Height is pinned to drawer state — user can resize width only.
+    minHeight: initialHeight,
+    maxHeight: initialHeight,
     show: true,
-    resizable: false,
+    resizable: true,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#00000000',
     vibrancy: 'under-window',
@@ -79,8 +86,12 @@ function createWindow() {
 
 function setWindowTuning(isTuning: boolean): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
+  const targetHeight = isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED
   const [w] = mainWindow.getSize()
-  mainWindow.setSize(w, isTuning ? WINDOW_HEIGHT_OPEN : WINDOW_HEIGHT_CLOSED, true)
+  // Unlock height temporarily so setSize isn't clamped by the previous min/max.
+  mainWindow.setMaximumSize(WINDOW_WIDTH_MAX, targetHeight)
+  mainWindow.setMinimumSize(WINDOW_WIDTH_MIN, targetHeight)
+  mainWindow.setSize(w, targetHeight, true)
 }
 
 app.on('ready', () => {
