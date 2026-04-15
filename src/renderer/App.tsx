@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useProfiles } from './hooks/useProfiles'
+import { useAutoResizeWindow } from './hooks/useAutoResizeWindow'
 import VolumeSlider from './components/VolumeSlider'
 import LedLadder from './components/LedLadder'
 import DspWarmthArc from './components/DspWarmthArc'
@@ -54,6 +55,8 @@ export default function App() {
   const [uiSounds, setUiSounds] = useState(false)
   const lastSoundEnabledRef = useRef(true)
   const metaTimerRef = useRef<number | null>(null)
+  const appRef = useRef<HTMLDivElement | null>(null)
+  useAutoResizeWindow(appRef, !shuttingDown)
 
   const activeMode = useMemo(() => {
     if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb)
@@ -118,6 +121,11 @@ export default function App() {
       window.setTimeout(() => setShuttingDown(false), 420)
     })
   }, [])
+
+  useEffect(() => {
+    if (!hasApi) return
+    window.api.setHelpOpen(helpOpen).catch(() => {})
+  }, [helpOpen])
 
   useEffect(() => {
     if (!hasApi) return
@@ -294,7 +302,7 @@ export default function App() {
   ].filter(Boolean).join(' ')
 
   return (
-    <div className={appCls}>
+    <div className={appCls} ref={appRef}>
       {/* Top plate — help button, status LED */}
       <div className="top-plate">
         <div className="help-wrap">
