@@ -32,7 +32,7 @@ export default function HelpPanel({ finish, onFinishChange, onClose }: Props) {
     const first = ref.current?.querySelector<HTMLElement>('button, [tabindex]:not([tabindex="-1"])')
     first?.focus()
     return () => {
-      // Restore focus to the triggering button (typically .help-button) on unmount
+      // Restore focus to the triggering button (typically .slash-notch) on unmount
       if (triggerRef.current instanceof HTMLElement) triggerRef.current.focus()
     }
   }, [])
@@ -65,7 +65,7 @@ export default function HelpPanel({ finish, onFinishChange, onClose }: Props) {
       if (!ref.current) return
       if (ref.current.contains(e.target as Node)) return
       const target = e.target as HTMLElement
-      if (target.closest('.help-button')) return
+      if (target.closest('.slash-notch')) return
       onClose()
     }
     window.addEventListener('mousedown', onDown)

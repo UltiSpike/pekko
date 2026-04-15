@@ -297,24 +297,17 @@ export default function App() {
       {/* Top plate — help button, status LED */}
       <div className="top-plate">
         <div className="help-wrap">
+          {/* Slash Notch — the geometric silhouette of the `/` key as a 10×1px
+              hairline tilted 22.5°. One visual, transparent feel, teaches its
+              own shortcut by rotating to vertical when help is open. Tune has
+              no visible hint — T keyboard only (discoverable via help panel). */}
           <button
-            className={`help-button${isTuning ? ' on' : ''}`}
-            onClick={() => handleTuningChange(!isTuning)}
-            aria-label={isTuning ? 'Close tune drawer' : 'Open tune drawer'}
-            aria-expanded={isTuning}
-            title={isTuning ? 'Close tune (T)' : 'Tune (T)'}
-          >
-            Tune
-          </button>
-          <button
-            className={`help-button${helpOpen ? ' on' : ''}`}
+            className={`slash-notch${helpOpen ? ' on' : ''}`}
             onClick={() => setHelpOpen((o) => !o)}
             aria-label="Shortcuts and finish"
             aria-expanded={helpOpen}
             title="Shortcuts and finish (/)"
-          >
-            Help
-          </button>
+          />
           <StatusLed
             active={typingActive && soundEnabled}
             muted={!soundEnabled}
