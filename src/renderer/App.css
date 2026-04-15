@@ -233,7 +233,7 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 .app {
   position: relative;
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
   background: var(--chassis);
   display: flex;
   flex-direction: column;
@@ -407,48 +407,46 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   -webkit-app-region: no-drag;
 }
 
-/* Slash Notch — the `/` key rendered as a tool-mark.
-   10×1px hairline tilted 22.5° (the glyph's own angle). Transparent feel at idle;
-   presents on hover; rotates to vertical when help opens — the mark teaches its
-   own shortcut by animating in response to the key. See ONYX v2.5 rationale. */
-.slash-notch {
-  width: 32px;
-  height: 32px;
+/* Slash Key — 18×18 keycap glyph of the `/` shortcut. Replaces v2.5's
+   near-invisible 10×1 hairline. Idle reads as a chassis label; hover/active
+   routes through --interactive so it behaves like any other actionable on
+   the panel. */
+.slash-key {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
   background: transparent;
-  border: none;
-  padding: 0;
+  color: var(--ink-2);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-align: center;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+  padding: 0;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
 }
-.slash-notch::before {
-  content: '';
-  width: 10px;
-  height: 1px;
-  background: var(--ink-2);
-  opacity: 0.24;
-  transform: rotate(22.5deg);
-  transform-origin: center;
-  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+.slash-key:hover,
+.slash-key:focus-visible {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  outline: none;
 }
-.slash-notch:hover::before  { opacity: 0.56; }
-.slash-notch.on::before     { opacity: 0.72; transform: rotate(90deg); }
-.slash-notch:focus-visible  { outline: none; }
-.slash-notch:focus-visible::before {
-  opacity: 0.72;
-  box-shadow: 0 0 0 4px var(--focus-ring);
-  /* subtle focus ring around the stroke itself, not the 32×32 hit target */
+.slash-key:focus-visible {
+  box-shadow: 0 0 0 2px var(--chassis), 0 0 0 3px var(--focus-ring);
+}
+.slash-key.on {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
 }
 
 /* ONYX v2.3 — Help panel is "service mode": it fills the rest of the chassis
    content area (below top-plate) instead of floating over it. No shadow, no
    blur, same surface — the chassis flips to a reference card. */
 .help-panel {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   padding: var(--s-4) 0 var(--s-5);
   display: flex;
   flex-direction: column;
