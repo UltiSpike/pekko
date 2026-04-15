@@ -144,7 +144,7 @@ export function registerIpcHandlers(hooks: Hooks = {}): void {
   ipcMain.handle('set-is-tuning', (_event, t: boolean) => { setIsTuning(t); hooks.onTuningChange?.(t); return true })
   ipcMain.handle('set-finish', (_event, f: Finish) => { setFinish(f); rebuildTrayMenu(); return true })
   ipcMain.handle('set-ui-sounds', (_event, enabled: boolean) => { setUiSounds(enabled); rebuildTrayMenu(); return true })
-  ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle }) => {
+  ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle; arcadeEnabled: boolean }) => {
     setCustomConfig(cfg)
     return true
   })

@@ -39,6 +39,7 @@ export default function App() {
   const [customBed, setCustomBed] = useState<BedType>(DEFAULT_CUSTOM_BED)
   const [customBedGainDb, setCustomBedGainDb] = useState<number>(DEFAULT_CUSTOM_BED_GAIN_DB)
   const [customStyle, setCustomStyle] = useState<ModeStyle>({ ...DEFAULT_CUSTOM_STYLE })
+  const [customArcadeEnabled, setCustomArcadeEnabled] = useState<boolean>(false)
 
   const [switchDspOverrides, setSwitchDspOverrides] = useState<Record<string, SwitchDspOverride>>({})
 
@@ -60,9 +61,9 @@ export default function App() {
   useAutoResizeWindow(appRef, !shuttingDown)
 
   const activeMode = useMemo(() => {
-    if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb)
+    if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb, customArcadeEnabled ?? false)
     return MODES.find(m => m.id === mode) ?? MODES[0]
-  }, [mode, customStyle, customBed, customBedGainDb])
+  }, [mode, customStyle, customBed, customBedGainDb, customArcadeEnabled])
 
   const activeProfileObj = profiles.find(p => p.id === activeProfile)
   const presetDsp = activeProfileObj?.dsp ?? DEFAULT_SWITCH_DSP
@@ -94,6 +95,7 @@ export default function App() {
       if (s.customBed) setCustomBed(s.customBed)
       if (typeof s.customBedGainDb === 'number') setCustomBedGainDb(s.customBedGainDb)
       if (s.customStyle) setCustomStyle(s.customStyle)
+      if (typeof s.customArcadeEnabled === 'boolean') setCustomArcadeEnabled(s.customArcadeEnabled)
       if (s.switchDspOverrides) setSwitchDspOverrides(s.switchDspOverrides)
     }).catch(console.error)
   }, [])

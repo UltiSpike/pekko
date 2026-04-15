@@ -55,6 +55,8 @@ export interface AppSettings {
   customBed: BedType
   customBedGainDb: number
   customStyle: ModeStyle
+  // Opt-in arcade overlay inside Custom Mode
+  customArcadeEnabled: boolean
   // Per-switch DSP overrides keyed by profileId. Stored as Partial so that if the
   // curated preset evolves, untouched fields keep tracking the new defaults.
   switchDspOverrides: Record<string, SwitchDspOverride>

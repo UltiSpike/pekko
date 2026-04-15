@@ -24,6 +24,7 @@ const defaults: AppSettings = {
   customBed: DEFAULT_CUSTOM_BED,
   customBedGainDb: DEFAULT_CUSTOM_BED_GAIN_DB,
   customStyle: { ...DEFAULT_CUSTOM_STYLE },
+  customArcadeEnabled: false,
   switchDspOverrides: {},
 }
 
@@ -49,6 +50,7 @@ function mergeSettings(stored: Partial<AppSettings>): AppSettings {
     finish: finish ?? defaults.finish,
     holdRepeat: typeof stored.holdRepeat === 'boolean' ? stored.holdRepeat : defaults.holdRepeat,
     customStyle: { ...defaults.customStyle, ...(stored.customStyle ?? {}) },
+    customArcadeEnabled: typeof stored.customArcadeEnabled === 'boolean' ? stored.customArcadeEnabled : defaults.customArcadeEnabled,
     switchDspOverrides: { ...defaults.switchDspOverrides, ...(stored.switchDspOverrides ?? {}) },
   }
 }
@@ -98,11 +100,12 @@ export function setMode(modeId: string): void {
   writeStore(s)
 }
 
-export function setCustomConfig(cfg: { bed: BedType; bedGainDb: number; style: ModeStyle }): void {
+export function setCustomConfig(cfg: { bed: BedType; bedGainDb: number; style: ModeStyle; arcadeEnabled: boolean }): void {
   const s = readStore()
   s.customBed = cfg.bed
   s.customBedGainDb = cfg.bedGainDb
   s.customStyle = cfg.style
+  s.customArcadeEnabled = cfg.arcadeEnabled
   writeStore(s)
 }
 
