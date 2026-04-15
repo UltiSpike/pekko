@@ -21,7 +21,7 @@ import {
   ModeStyle,
   SwitchDspOverride,
 } from '@shared/modes'
-import { Finish, FINISHES } from '@shared/types'
+import { Finish, FINISHES, HoldRepeatMode } from '@shared/types'
 import { playDrawerOpen, playDrawerClose, playMuteToggle } from './audio/uiSounds'
 import './App.css'
 
@@ -54,7 +54,7 @@ export default function App() {
   const [shuttingDown, setShuttingDown] = useState(false)
   const warmupPlayedRef = useRef(false)
   const [uiSounds, setUiSounds] = useState(false)
-  const [holdRepeat, setHoldRepeatState] = useState(false)
+  const [holdRepeat, setHoldRepeatState] = useState<HoldRepeatMode>('off')
   const lastSoundEnabledRef = useRef(true)
   const metaTimerRef = useRef<number | null>(null)
   const appRef = useRef<HTMLDivElement | null>(null)
@@ -91,7 +91,13 @@ export default function App() {
       if (typeof s.isTuning === 'boolean') setIsTuning(s.isTuning)
       if (s.finish) setFinish(s.finish)
       if (typeof s.uiSounds === 'boolean') setUiSounds(s.uiSounds)
-      if (typeof s.holdRepeat === 'boolean') setHoldRepeatState(s.holdRepeat)
+      if (s.holdRepeat === 'off' || s.holdRepeat === 'edit' || s.holdRepeat === 'global') {
+        setHoldRepeatState(s.holdRepeat)
+      } else if (typeof s.holdRepeat === 'boolean') {
+        // Cold migration: a stored boolean arrives before main's mergeSettings
+        // rewrites it. Map identically to the main-side rule.
+        setHoldRepeatState(s.holdRepeat ? 'edit' : 'off')
+      }
       if (s.customBed) setCustomBed(s.customBed)
       if (typeof s.customBedGainDb === 'number') setCustomBedGainDb(s.customBedGainDb)
       if (s.customStyle) setCustomStyle(s.customStyle)
@@ -202,7 +208,7 @@ export default function App() {
     if (hasApi) await window.api.setFinish(next)
   }, [])
 
-  const handleHoldRepeatChange = useCallback(async (next: boolean) => {
+  const handleHoldRepeatChange = useCallback(async (next: HoldRepeatMode) => {
     setHoldRepeatState(next)
     if (hasApi) await window.api.setHoldRepeat(next)
   }, [])

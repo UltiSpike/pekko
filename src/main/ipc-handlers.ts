@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, setUiSounds, setCustomConfig, setSwitchDspOverride, setHoldRepeat } from './store'
 import type { BedType, ModeStyle, SwitchDspOverride } from '../shared/modes'
-import type { Finish } from '../shared/types'
+import type { Finish, HoldRepeatMode } from '../shared/types'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
 import { rebuildTrayMenu, updateArcadeHud, ArcadeHudState } from './tray'
 
@@ -99,7 +99,7 @@ type Hooks = {
   onTuningChange?: (isTuning: boolean) => void
   onResize?: (height: number) => void
   onHelpOpenChange?: (open: boolean) => void
-  onHoldRepeatChange?: (enabled: boolean) => void
+  onHoldRepeatChange?: (mode: HoldRepeatMode) => void
 }
 
 export function registerIpcHandlers(hooks: Hooks = {}): void {
@@ -163,11 +163,11 @@ export function registerIpcHandlers(hooks: Hooks = {}): void {
     hooks.onHelpOpenChange?.(!!open)
     return true
   })
-  ipcMain.handle('set-hold-repeat', (_event, enabled: boolean) => {
-    const v = !!enabled
-    setHoldRepeat(v)
+  ipcMain.handle('set-hold-repeat', (_event, mode: HoldRepeatMode) => {
+    if (mode !== 'off' && mode !== 'edit' && mode !== 'global') return false
+    setHoldRepeat(mode)
     rebuildTrayMenu()
-    hooks.onHoldRepeatChange?.(v)
+    hooks.onHoldRepeatChange?.(mode)
     return true
   })
 

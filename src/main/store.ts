@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { AppSettings, Finish, FINISH_MIGRATION } from '../shared/types'
+import { AppSettings, Finish, FINISH_MIGRATION, HoldRepeatMode } from '../shared/types'
 import {
   DEFAULT_MODE_ID,
   DEFAULT_CUSTOM_STYLE,
@@ -20,7 +20,7 @@ const defaults: AppSettings = {
   isTuning: false,
   finish: 'indigo-linen',
   uiSounds: false,
-  holdRepeat: false,
+  holdRepeat: 'off',
   customBed: DEFAULT_CUSTOM_BED,
   customBedGainDb: DEFAULT_CUSTOM_BED_GAIN_DB,
   customStyle: { ...DEFAULT_CUSTOM_STYLE },
@@ -44,11 +44,25 @@ function mergeSettings(stored: Partial<AppSettings>): AppSettings {
     ? FINISH_MIGRATION[storedFinish]
     : (stored.finish as Finish | undefined)
 
+  // Hold-repeat migration: v1 boolean → v2 tri-state.
+  //   true  → 'edit'  (preserve old 6-key whitelist behavior)
+  //   false → 'off'
+  //   string values 'off' | 'edit' | 'global' pass through; anything else → default.
+  const rawHr = stored.holdRepeat as unknown
+  let holdRepeat: HoldRepeatMode
+  if (typeof rawHr === 'boolean') {
+    holdRepeat = rawHr ? 'edit' : 'off'
+  } else if (rawHr === 'off' || rawHr === 'edit' || rawHr === 'global') {
+    holdRepeat = rawHr
+  } else {
+    holdRepeat = defaults.holdRepeat
+  }
+
   return {
     ...defaults,
     ...stored,
     finish: finish ?? defaults.finish,
-    holdRepeat: typeof stored.holdRepeat === 'boolean' ? stored.holdRepeat : defaults.holdRepeat,
+    holdRepeat,
     customStyle: { ...defaults.customStyle, ...(stored.customStyle ?? {}) },
     customArcadeEnabled: typeof stored.customArcadeEnabled === 'boolean' ? stored.customArcadeEnabled : defaults.customArcadeEnabled,
     switchDspOverrides: { ...defaults.switchDspOverrides, ...(stored.switchDspOverrides ?? {}) },
@@ -147,9 +161,9 @@ export function setUiSounds(enabled: boolean): void {
   writeStore(s)
 }
 
-export function setHoldRepeat(enabled: boolean): void {
+export function setHoldRepeat(mode: HoldRepeatMode): void {
   const s = getSettings()
-  s.holdRepeat = enabled
+  s.holdRepeat = mode
   writeStore(s)
 }
 

@@ -1,7 +1,7 @@
 # Pekko · Hold-Repeat Clicks Design
 
 **Date:** 2026-04-15
-**Status:** design approved — ready for plan
+**Status:** design approved — ready for plan (v1 shipped) · **Revision v2 appended § 11**
 **Predecessor:** v3 chassis redesign ([2026-04-15-chassis-v3-redesign-design.md](2026-04-15-chassis-v3-redesign-design.md))
 **Scope:** additive feature — does not alter v3 chassis behavior
 
@@ -143,3 +143,94 @@ The renderer is the source of UI state; main is the source of truth for the keyb
 - Additional repeat-eligible keys (`Tab`, `Space` — would create noise during text editing where these are commonly held).
 - Mouse / trackpad expansion (separate product question, deferred indefinitely).
 - Per-app whitelist (e.g. only repeat in code editors). Out of project scope.
+
+---
+
+## 11. Revision v2 · Tri-State Expansion
+
+**Date:** 2026-04-15 (same-day iteration)
+**Driver:** Users who want hold-repeat on **every** key (not just the editing-keys whitelist) were unserved by the v1 boolean toggle. Promoting the boolean to a tri-state lets the feature meet both the "safe default subset" and "opt-in everywhere" cases without inventing a second toggle.
+
+### 11.1 Data shape
+
+Replace `holdRepeat: boolean` with:
+
+```ts
+export type HoldRepeatMode = 'off' | 'edit' | 'global'
+holdRepeat: HoldRepeatMode
+```
+
+Semantics:
+
+| Mode | Auto-repeat policy |
+|---|---|
+| `'off'` | Drop every OS auto-repeat event (= v1 false; baseline physical realism) |
+| `'edit'` | Pass auto-repeat **only** if key is in `REPEAT_KEYS` (⌫ ⌦ ← → ↑ ↓; = v1 true) |
+| `'global'` | Pass auto-repeat for every key |
+
+### 11.2 Migration
+
+In `mergeSettings()` (`src/main/store.ts`):
+
+| Stored `holdRepeat` value | v2 runtime value |
+|---|---|
+| `true` (v1 on) | `'edit'` — preserve prior behavior |
+| `false` (v1 off) | `'off'` |
+| `'off'` / `'edit'` / `'global'` | pass through |
+| anything else | `defaults.holdRepeat` (= `'off'`) |
+
+Migration is one-way: the next `writeStore` call rewrites the JSON with the tri-state string. The renderer's `useEffect`-time load also accepts legacy booleans defensively, in case main hasn't rewritten yet.
+
+### 11.3 Control surfaces
+
+**Help panel** — segment count goes 2 → 3; label changes:
+
+```
+Hold-repeat clicks   [ OFF ] [ EDIT ] [ ALL ]
+  <caption changes with selection>
+```
+
+Caption per mode:
+- `off` → `—`
+- `edit` → `⌫  ⌦  ←  →  ↑  ↓`
+- `global` → `every key`
+
+Existing `.repeat-toggle-seg + .repeat-toggle-seg` sibling-border rule handles a third segment without CSS changes.
+
+**Tray menu** — checkbox → submenu:
+
+```
+Hold-Repeat · <Current label>
+  ○ Off
+  ● Edit keys  (⌫ ⌦ ← → ↑ ↓)
+  ○ All keys
+  ──
+  ⇧⌘R cycle        (disabled hint row)
+```
+
+The top-level label includes the current mode's short form (`Off` / `Edit keys` / `All keys`) so state is visible without expanding the submenu. The `⇧⌘R` hint is a disabled menu item — Electron does not allow accelerators on submenu children, so the shortcut lives only at the global level (see below).
+
+**Global shortcut (`⇧⌘R`)** — toggle → cycle:
+
+```ts
+off → edit → global → off
+```
+
+The cycle order matches `HOLD_REPEAT_CYCLE` exported from `src/shared/types.ts`, used by both main (shortcut handler) and (potentially) renderer in future.
+
+### 11.4 IPC contract
+
+- `set-hold-repeat` payload: `boolean` → `HoldRepeatMode`. Handler validates against the union; invalid values return `false` without state change.
+- `hold-repeat-changed` broadcast payload: same type shift.
+- Preload `setHoldRepeat` / `onHoldRepeatChanged` signatures updated.
+- Renderer `window.api` ambient declaration in `useAudioEngine.ts` updated.
+
+### 11.5 Acceptance delta (beyond v1 §9)
+
+1. Setting `'global'` and holding `A` produces a continuous click stream (new behavior — v1 dropped this).
+2. Setting `'edit'` behaves exactly like v1 true (regression check).
+3. Setting `'off'` behaves exactly like v1 false (regression check).
+4. `⇧⌘R` cycles through all three states (three presses return to start).
+5. Tray submenu radios reflect current state; tray label shows short form.
+6. First launch after upgrading from a v1 `true` setting lands on `'edit'` without prompting.
+7. IPC handler rejects string values outside the union without crashing.

@@ -3,7 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import { getSettings, setProfile, setVolume, setFinish, setUiSounds, setHoldRepeat } from './store'
 import { setHoldRepeat as setKeyboardHoldRepeat } from './keyboard'
-import { Profile, FINISHES, Finish } from '../shared/types'
+import { Profile, FINISHES, Finish, HoldRepeatMode } from '../shared/types'
 
 export type ArcadeHudState =
   | { kind: 'idle' }
@@ -21,6 +21,19 @@ let _soundEnabled = true
 // must not reveal the window at the provisional MIN_H size before the
 // renderer's first ResizeObserver fire has corrected it.
 let canShow: () => boolean = () => true
+
+function holdRepeatSummary(mode: HoldRepeatMode): string {
+  return mode === 'off' ? 'Off' : mode === 'edit' ? 'Edit keys' : 'All keys'
+}
+
+function applyHoldRepeat(mode: HoldRepeatMode): void {
+  setHoldRepeat(mode)
+  setKeyboardHoldRepeat(mode)
+  rebuildTrayMenu()
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('hold-repeat-changed', mode)
+  }
+}
 
 function loadProfiles(): Profile[] {
   try {
@@ -105,19 +118,29 @@ function buildMenu(): Menu {
       },
     },
     {
-      label: 'Hold-Repeat Clicks',
-      type: 'checkbox' as const,
-      accelerator: 'CommandOrControl+Shift+R',
-      checked: getSettings().holdRepeat,
-      click: () => {
-        const next = !getSettings().holdRepeat
-        setHoldRepeat(next)
-        setKeyboardHoldRepeat(next)
-        rebuildTrayMenu()
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('hold-repeat-changed', next)
-        }
-      },
+      label: `Hold-Repeat · ${holdRepeatSummary(settings.holdRepeat)}`,
+      submenu: [
+        {
+          label: 'Off',
+          type: 'radio' as const,
+          checked: settings.holdRepeat === 'off',
+          click: () => applyHoldRepeat('off'),
+        },
+        {
+          label: 'Edit keys  (⌫ ⌦ ← → ↑ ↓)',
+          type: 'radio' as const,
+          checked: settings.holdRepeat === 'edit',
+          click: () => applyHoldRepeat('edit'),
+        },
+        {
+          label: 'All keys',
+          type: 'radio' as const,
+          checked: settings.holdRepeat === 'global',
+          click: () => applyHoldRepeat('global'),
+        },
+        { type: 'separator' },
+        { label: '⇧⌘R  cycle', enabled: false },
+      ],
     },
     { type: 'separator' },
     {

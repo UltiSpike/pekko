@@ -46,9 +46,10 @@ export interface AppSettings {
   // Opt-in UI sound cues for drawer open/close + mute toggle. Default off —
   // a menu-bar tool shouldn't make sound of its own without permission.
   uiSounds: boolean
-  // Opt-in: when true, OS auto-repeat for ⌫ ⌦ ←→↑↓ produces click sounds.
-  // All other keys remain physically realistic (silent on hold).
-  holdRepeat: boolean
+  // Three-tier hold-repeat. 'off' = silent on hold for every key (default);
+  // 'edit' = repeat only ⌫ ⌦ ←→↑↓ (prior boolean-true behavior); 'global' =
+  // repeat every key's OS auto-repeat stream.
+  holdRepeat: HoldRepeatMode
   // Timestamp (ms epoch) of the last window close. Used by the v2.2 isTuning
   // stale guard — if reopen happens > 1 hour later, drawer state is cleared.
   lastCloseAt?: number
@@ -66,3 +67,8 @@ export interface KeyEvent {
   keycode: number
   type: 'down' | 'up' | 'repeat'
 }
+
+export type HoldRepeatMode = 'off' | 'edit' | 'global'
+
+// UI cycle order (used by ⇧⌘R) — ascending intensity.
+export const HOLD_REPEAT_CYCLE: HoldRepeatMode[] = ['off', 'edit', 'global']

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { audioEngine } from '../audio/AudioEngine'
 import type { Mode, SwitchDsp, SwitchDspOverride } from '@shared/modes'
+import type { HoldRepeatMode } from '@shared/types'
 
 declare global {
   interface Window {
@@ -12,10 +13,10 @@ declare global {
       onFinishChanged: (cb: (finish: string) => void) => void
       onBeforeHide: (cb: () => void) => void
       onUiSoundsChanged: (cb: (enabled: boolean) => void) => void
-      onHoldRepeatChanged: (cb: (enabled: boolean) => void) => void
+      onHoldRepeatChanged: (cb: (mode: HoldRepeatMode) => void) => void
       onPowerResume: (cb: () => void) => void
       setUiSounds: (enabled: boolean) => Promise<boolean>
-      setHoldRepeat: (enabled: boolean) => Promise<boolean>
+      setHoldRepeat: (mode: HoldRepeatMode) => Promise<boolean>
       setMode: (m: string) => Promise<boolean>
       setIsTuning: (t: boolean) => Promise<boolean>
       setFinish: (f: string) => Promise<boolean>

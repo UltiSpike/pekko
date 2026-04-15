@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { HoldRepeatMode } from '../shared/types'
 
 // Key event callback — wired via MessagePort for lowest latency
 let keyCallback: ((keycode: number, type: 'down' | 'up' | 'repeat') => void) | null = null
@@ -53,9 +54,9 @@ ipcRenderer.on('ui-sounds-changed', (_e, enabled: boolean) => {
   if (uiSoundsChangedCallback) uiSoundsChangedCallback(enabled)
 })
 
-let holdRepeatChangedCallback: ((enabled: boolean) => void) | null = null
-ipcRenderer.on('hold-repeat-changed', (_e, enabled: boolean) => {
-  if (holdRepeatChangedCallback) holdRepeatChangedCallback(enabled)
+let holdRepeatChangedCallback: ((mode: HoldRepeatMode) => void) | null = null
+ipcRenderer.on('hold-repeat-changed', (_e, mode: HoldRepeatMode) => {
+  if (holdRepeatChangedCallback) holdRepeatChangedCallback(mode)
 })
 
 // Main broadcasts 'power-resume' after sleep/unlock/user-active events so the
@@ -74,7 +75,7 @@ contextBridge.exposeInMainWorld('api', {
   onFinishChanged: (cb: (finish: string) => void) => { finishChangedCallback = cb },
   onBeforeHide:    (cb: () => void) => { beforeHideCallback = cb },
   onUiSoundsChanged: (cb: (enabled: boolean) => void) => { uiSoundsChangedCallback = cb },
-  onHoldRepeatChanged: (cb: (enabled: boolean) => void) => { holdRepeatChangedCallback = cb },
+  onHoldRepeatChanged: (cb: (mode: HoldRepeatMode) => void) => { holdRepeatChangedCallback = cb },
   onPowerResume:   (cb: () => void) => { powerResumeCallback = cb },
   setUiSounds:     (enabled: boolean) => ipcRenderer.invoke('set-ui-sounds', enabled),
   setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
@@ -85,7 +86,7 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('set-switch-dsp-override', { profileId, override }),
   resizeWindow:    (h: number)  => ipcRenderer.invoke('resize-window', h),
   setHelpOpen:     (open: boolean) => ipcRenderer.invoke('set-help-open', open),
-  setHoldRepeat:   (enabled: boolean) => ipcRenderer.invoke('set-hold-repeat', enabled),
+  setHoldRepeat:   (mode: HoldRepeatMode) => ipcRenderer.invoke('set-hold-repeat', mode),
   updateArcadeHud: (state: { kind: 'idle' } | { kind: 'active'; stage: 'engaged' | 'stacking' | 'flow' | 'zone'; perfect: boolean }) =>
     ipcRenderer.send('update-arcade-hud', state),
   getSettings:       ()            => ipcRenderer.invoke('get-settings'),

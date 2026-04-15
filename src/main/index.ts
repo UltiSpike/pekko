@@ -5,6 +5,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { createTray, setSoundEnabled, rebuildTrayMenu } from './tray'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
 import { getSettings, recordClose, setHoldRepeat } from './store'
+import { HOLD_REPEAT_CYCLE } from '../shared/types'
 
 // Shutdown choreography — renderer plays a 400ms fade before main hides the
 // window. Slightly over the animation duration to let the keyframe finish.
@@ -139,9 +140,9 @@ app.on('ready', () => {
     onHelpOpenChange: (open) => {
       isHelpOpen = open
     },
-    onHoldRepeatChange: (enabled) => {
-      setKeyboardHoldRepeat(enabled)
-      mainWindow?.webContents.send('hold-repeat-changed', enabled)
+    onHoldRepeatChange: (mode) => {
+      setKeyboardHoldRepeat(mode)
+      mainWindow?.webContents.send('hold-repeat-changed', mode)
     }
   })
 
@@ -193,16 +194,18 @@ app.on('ready', () => {
     }
   })
 
-  // Global: ⇧⌘R toggle hold-repeat
+  // Global: ⇧⌘R cycle hold-repeat  (off → edit → global → off)
   const holdRepeatRegistered = globalShortcut.register('CommandOrControl+Shift+R', () => {
-    const next = !getSettings().holdRepeat
+    const curr = getSettings().holdRepeat
+    const idx = HOLD_REPEAT_CYCLE.indexOf(curr)
+    const next = HOLD_REPEAT_CYCLE[(idx + 1) % HOLD_REPEAT_CYCLE.length]
     setHoldRepeat(next)
     setKeyboardHoldRepeat(next)
     rebuildTrayMenu()
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('hold-repeat-changed', next)
     }
-    console.log(`[Pekko] Hold-repeat ${next ? 'ON' : 'OFF'}`)
+    console.log(`[Pekko] Hold-repeat → ${next}`)
   })
   if (!holdRepeatRegistered) {
     console.warn('[Pekko] ⇧⌘R could not be registered — another app holds it. Use the help panel toggle or tray menu instead.')

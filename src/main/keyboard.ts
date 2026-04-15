@@ -1,9 +1,11 @@
 import { BrowserWindow, MessageChannelMain } from 'electron'
 import { uIOhook, UiohookKey } from 'uiohook-napi'
 import { pulseTrayOnce } from './tray'
+import type { HoldRepeatMode } from '../shared/types'
 
-// uIOhook keycodes for the six "information work" keys that get hold-repeat
-// when the toggle is on. Other keys remain physically realistic (silent on hold).
+// uIOhook keycodes for the six "information work" keys — the subset that
+// gets hold-repeat in 'edit' mode. 'global' mode ignores this set and lets
+// every key through; 'off' mode drops every auto-repeat.
 const REPEAT_KEYS: ReadonlySet<number> = new Set([
   UiohookKey.Backspace,
   UiohookKey.Delete,
@@ -13,10 +15,10 @@ const REPEAT_KEYS: ReadonlySet<number> = new Set([
   UiohookKey.ArrowRight,
 ])
 
-let holdRepeatEnabled = false
+let holdRepeatMode: HoldRepeatMode = 'off'
 
-export function setHoldRepeat(enabled: boolean): void {
-  holdRepeatEnabled = enabled
+export function setHoldRepeat(mode: HoldRepeatMode): void {
+  holdRepeatMode = mode
 }
 
 let isListening = false
@@ -24,9 +26,9 @@ let eventsRegistered = false
 const activeKeys = new Set<number>()
 let keyPort: Electron.MessagePortMain | null = null
 
-export function startKeyboardListener(mainWindow: BrowserWindow, initialHoldRepeat: boolean): boolean {
+export function startKeyboardListener(mainWindow: BrowserWindow, initialHoldRepeat: HoldRepeatMode): boolean {
   if (isListening) return true
-  holdRepeatEnabled = initialHoldRepeat
+  holdRepeatMode = initialHoldRepeat
 
   // Create MessagePort (renderer needs this even before listener starts)
   if (!keyPort) {
@@ -41,8 +43,12 @@ export function startKeyboardListener(mainWindow: BrowserWindow, initialHoldRepe
     uIOhook.on('keydown', (event: any) => {
       const kc = event.keycode
       if (activeKeys.has(kc)) {
-        // OS auto-repeat. Drop unless this key is whitelisted AND toggle is on.
-        if (!holdRepeatEnabled || !REPEAT_KEYS.has(kc)) return
+        // OS auto-repeat. Filter by current mode:
+        //   off    → drop all repeats
+        //   edit   → drop unless key is in REPEAT_KEYS
+        //   global → pass every repeat through
+        if (holdRepeatMode === 'off') return
+        if (holdRepeatMode === 'edit' && !REPEAT_KEYS.has(kc)) return
         keyPort?.postMessage([kc, 2])
         return
       }

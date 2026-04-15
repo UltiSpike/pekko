@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
-import { Finish, FINISHES } from '@shared/types'
+import { Finish, FINISHES, HoldRepeatMode } from '@shared/types'
 import type { OutputInfo } from '../hooks/useAudioEngine'
 
 interface Props {
   finish: Finish
   onFinishChange: (f: Finish) => void
   outputInfo: OutputInfo | null
-  holdRepeat: boolean
-  onHoldRepeatChange: (enabled: boolean) => void
+  holdRepeat: HoldRepeatMode
+  onHoldRepeatChange: (mode: HoldRepeatMode) => void
   onClose: () => void
 }
 
@@ -110,19 +110,29 @@ export default function HelpPanel({ finish, onFinishChange, outputInfo, holdRepe
           <div className="repeat-toggle-segments" role="group" aria-label="Hold-repeat clicks">
             <button
               type="button"
-              className={`repeat-toggle-seg${holdRepeat ? ' on' : ''}`}
-              aria-pressed={holdRepeat}
-              onClick={() => onHoldRepeatChange(true)}
-            >ON</button>
+              className={`repeat-toggle-seg${holdRepeat === 'off' ? ' on' : ''}`}
+              aria-pressed={holdRepeat === 'off'}
+              onClick={() => onHoldRepeatChange('off')}
+            >OFF</button>
             <button
               type="button"
-              className={`repeat-toggle-seg${!holdRepeat ? ' on' : ''}`}
-              aria-pressed={!holdRepeat}
-              onClick={() => onHoldRepeatChange(false)}
-            >OFF</button>
+              className={`repeat-toggle-seg${holdRepeat === 'edit' ? ' on' : ''}`}
+              aria-pressed={holdRepeat === 'edit'}
+              onClick={() => onHoldRepeatChange('edit')}
+            >EDIT</button>
+            <button
+              type="button"
+              className={`repeat-toggle-seg${holdRepeat === 'global' ? ' on' : ''}`}
+              aria-pressed={holdRepeat === 'global'}
+              onClick={() => onHoldRepeatChange('global')}
+            >ALL</button>
           </div>
         </div>
-        <div className="repeat-toggle-caption">⌫  ⌦  ←  →  ↑  ↓</div>
+        <div className="repeat-toggle-caption">
+          {holdRepeat === 'off' && '—'}
+          {holdRepeat === 'edit' && '⌫  ⌦  ←  →  ↑  ↓'}
+          {holdRepeat === 'global' && 'every key'}
+        </div>
       </div>
 
       <hr className="help-divider" />
