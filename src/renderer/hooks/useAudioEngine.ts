@@ -56,6 +56,8 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
   useEffect(() => {
     if (!window.api) return
     window.api.onKeyEvent((keycode, type) => {
+      // TEMP DIAG — remove after debug
+      console.log('[Diag] key', keycode, type, 'ctx=', (audioEngine as any).ctx?.state, 'enabled=', (audioEngine as any)._enabled, 'profile=', (audioEngine as any).activeProfile, 'masterGain=', (audioEngine as any).masterGain?.gain.value)
       audioEngine.resume()
       audioEngine.playSound(keycode, type)
       pollWpm()
