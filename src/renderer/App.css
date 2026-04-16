@@ -1,844 +1,1233 @@
 /* =============================================
-   Pekko — Theme System
-   6 classic palettes by real designers
+   Pekko — CHASSIS design system
+   See docs/design/CHASSIS.md
    ============================================= */
 
-/* === SHARED (theme-independent) === */
 :root {
-  --r: 6px;
-  --r-sm: 3px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --font: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
-}
+  --r: 6px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
 
+  /* Single noise SVG, used at per-material opacity. Per-material grain (stone /
+     paper / copper / cloth) can specialise later by varying baseFrequency. */
+  --noise-url: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+  --noise-opacity: 0.04;
+}
 
 /* =============================================
-   THEMES — official palette colors
+   Materials — chassis / LED / interactive committed pairings.
+   Picked via [data-finish="..."] on <html>.
+   'auto' (or absent) = system light/dark → Bone / Basalt.
+
+   Token roles (decoupled in v2.1):
+     LED tokens (--led-*)       → engine-driven indicators only
+     Interactive tokens         → buttons, focus, tab underline
+     Engraving tokens           → debossed text edges
    ============================================= */
 
-/* ---- Catppuccin Mocha (Catppuccin org) ---- */
-[data-theme="catppuccin"] {
-  --bg: rgba(30, 30, 46, 0.88);
-  --surface-0: rgba(255, 255, 255, 0.03);
-  --surface-1: rgba(255, 255, 255, 0.055);
-  --surface-2: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-focus: rgba(255, 255, 255, 0.14);
-  --text: #cdd6f4; --text-muted: #6c7086; --text-dim: #45475a;
-  --accent: #89b4fa; --accent-soft: rgba(137, 180, 250, 0.10);
-  --success: #a6e3a1; --error: #f38ba8; --warning: #f9e2af;
-  --linear: #89b4fa; --tactile: #fab387; --clicky: #f38ba8;
+/* --- Basalt (default dark) — cool graphite stone, Nagra / Bricasti ---
+   v2.3: chassis shifted -5° hue toward blue-gray + interactive desaturated
+   further. v2.2's warm amber was reading "brown" over the whole panel when
+   LED + chips + focus all shared the same tone. */
+:root,
+:root[data-finish='auto'],
+:root[data-finish='basalt'] {
+  --chassis: rgba(18, 19, 21, 0.84);
+  --chassis-tint: #0C0D0F;
+  --ink-1: #E4E2DC;
+  --ink-2: #8F8E8A;
+  --hairline: rgba(255, 255, 255, 0.10);
+  --engrave-shadow: rgba(0, 0, 0, 0.45);
+  --engrave-highlight: rgba(240, 240, 245, 0.06);
+  /* LED kept warm (it's the "powered indicator" — stays amber for personality) */
+  --led-on: #FFB347;
+  --led-dim: rgba(255, 179, 71, 0.35);
+  --led-mute: #7A3529;
+  --led-peak: #FF8547;
+  /* Interactive desaturated MUCH further — reads as "softly lit" buttons, not
+     saturated amber all over the panel. */
+  --interactive: #B0A894;
+  --interactive-soft: rgba(176, 168, 148, 0.14);
+  --focus-ring: #C8BEA6;
 }
 
-/* ---- Tokyo Night (enkia) ---- */
-[data-theme="tokyo-night"] {
-  --bg: rgba(26, 27, 38, 0.90);
-  --surface-0: rgba(255, 255, 255, 0.025);
-  --surface-1: rgba(255, 255, 255, 0.05);
-  --surface-2: rgba(255, 255, 255, 0.075);
-  --border: rgba(255, 255, 255, 0.06);
-  --border-focus: rgba(255, 255, 255, 0.12);
-  --text: #a9b1d6; --text-muted: #565f89; --text-dim: #3b4261;
-  --accent: #7aa2f7; --accent-soft: rgba(122, 162, 247, 0.10);
-  --success: #9ece6a; --error: #f7768e; --warning: #e0af68;
-  --linear: #7aa2f7; --tactile: #e0af68; --clicky: #f7768e;
+/* --- Bone (auto on light system) — warm paper, Muji / Crane --- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-finish]),
+  :root[data-finish='auto'] {
+    --chassis: rgba(246, 242, 234, 0.74);
+    --chassis-tint: #ECE7DD;
+    --ink-1: #1A1815;
+    --ink-2: #5A544D;
+    --hairline: rgba(0, 0, 0, 0.10);
+    --engrave-shadow: rgba(50, 40, 30, 0.28);
+    --engrave-highlight: transparent;
+    --led-on: #C0392B;
+    --led-dim: rgba(192, 57, 43, 0.30);
+    --led-mute: #8A5C4E;
+    --led-peak: #D8503F;
+    --interactive: #A82E21;
+    --interactive-soft: rgba(168, 46, 33, 0.12);
+    --focus-ring: #A82E21;
+  }
 }
 
-/* ---- Rosé Pine (rosepinetheme.com) ---- */
-[data-theme="rose-pine"] {
-  --bg: rgba(25, 23, 36, 0.90);
-  --surface-0: rgba(255, 255, 255, 0.025);
-  --surface-1: rgba(255, 255, 255, 0.05);
-  --surface-2: rgba(255, 255, 255, 0.075);
-  --border: rgba(255, 255, 255, 0.06);
-  --border-focus: rgba(255, 255, 255, 0.12);
-  --text: #e0def4; --text-muted: #6e6a86; --text-dim: #44415a;
-  --accent: #c4a7e7; --accent-soft: rgba(196, 167, 231, 0.10);
-  --success: #9ccfd8; --error: #eb6f92; --warning: #f6c177;
-  --linear: #9ccfd8; --tactile: #f6c177; --clicky: #eb6f92;
+:root[data-finish='bone'] {
+  --chassis: rgba(246, 242, 234, 0.74);
+  --chassis-tint: #ECE7DD;
+  --ink-1: #1A1815;
+  --ink-2: #5A544D;
+  --hairline: rgba(0, 0, 0, 0.10);
+  --engrave-shadow: rgba(50, 40, 30, 0.28);
+  --engrave-highlight: transparent;
+  --led-on: #C0392B;
+  --led-dim: rgba(192, 57, 43, 0.30);
+  --led-mute: #8A5C4E;
+  --led-peak: #D8503F;
+  --interactive: #A82E21;
+  --interactive-soft: rgba(168, 46, 33, 0.12);
+  --focus-ring: #A82E21;
 }
 
-/* ---- Nord (nordtheme.com) ---- */
-[data-theme="nord"] {
-  --bg: rgba(46, 52, 64, 0.90);
-  --surface-0: rgba(255, 255, 255, 0.03);
-  --surface-1: rgba(255, 255, 255, 0.055);
-  --surface-2: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-focus: rgba(255, 255, 255, 0.14);
-  --text: #eceff4; --text-muted: #7b88a1; --text-dim: #4c566a;
-  --accent: #88c0d0; --accent-soft: rgba(136, 192, 208, 0.10);
-  --success: #a3be8c; --error: #bf616a; --warning: #ebcb8b;
-  --linear: #88c0d0; --tactile: #ebcb8b; --clicky: #bf616a;
+/* --- Verdigris (dark) — oxidised copper, antique brass --- */
+:root[data-finish='verdigris'] {
+  --chassis: rgba(10, 16, 12, 0.86);
+  --chassis-tint: #060904;
+  --ink-1: #CFE8D4;
+  --ink-2: #7C9A84;
+  --hairline: rgba(78, 190, 107, 0.15);
+  --engrave-shadow: rgba(0, 10, 8, 0.42);
+  --engrave-highlight: rgba(180, 230, 190, 0.08);
+  --led-on: #4EBE6B;
+  --led-dim: rgba(78, 190, 107, 0.30);
+  --led-mute: #1A3A22;
+  --led-peak: #72D880;
+  --interactive: #46A85F;
+  --interactive-soft: rgba(70, 168, 95, 0.14);
+  --focus-ring: #46A85F;
 }
 
-/* ---- Dracula (draculatheme.com) ---- */
-[data-theme="dracula"] {
-  --bg: rgba(40, 42, 54, 0.90);
-  --surface-0: rgba(255, 255, 255, 0.03);
-  --surface-1: rgba(255, 255, 255, 0.055);
-  --surface-2: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-focus: rgba(255, 255, 255, 0.14);
-  --text: #f8f8f2; --text-muted: #6272a4; --text-dim: #44475a;
-  --accent: #bd93f9; --accent-soft: rgba(189, 147, 249, 0.10);
-  --success: #50fa7b; --error: #ff5555; --warning: #f1fa8c;
-  --linear: #8be9fd; --tactile: #ffb86c; --clicky: #ff79c6;
+/* --- Patina (dark cool) — weathered teal metal, OP-1 / Walkman Pro --- */
+:root[data-finish='patina'] {
+  --chassis: rgba(22, 26, 30, 0.84);
+  --chassis-tint: #121519;
+  --ink-1: #DCE6EA;
+  --ink-2: #8A96A0;
+  --hairline: rgba(255, 255, 255, 0.10);
+  --engrave-shadow: rgba(0, 10, 15, 0.45);
+  --engrave-highlight: rgba(200, 230, 230, 0.07);
+  --led-on: #5FB8A8;
+  --led-dim: rgba(95, 184, 168, 0.30);
+  --led-mute: #2C4D48;
+  --led-peak: #78D4C2;
+  --interactive: #56A697;
+  --interactive-soft: rgba(86, 166, 151, 0.14);
+  --focus-ring: #56A697;
 }
 
-/* ---- Gruvbox Dark (morhetz) — default theme, applied when html has data-theme="gruvbox" ---- */
-[data-theme="gruvbox"] {
-  --bg: rgba(40, 40, 40, 0.90);
-  --surface-0: rgba(255, 255, 255, 0.03);
-  --surface-1: rgba(255, 255, 255, 0.055);
-  --surface-2: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.06);
-  --border-focus: rgba(255, 255, 255, 0.12);
-  --text: #ebdbb2; --text-muted: #928374; --text-dim: #665c54;
-  --accent: #fabd2f; --accent-soft: rgba(250, 189, 47, 0.10);
-  --success: #b8bb26; --error: #fb4934; --warning: #fabd2f;
-  --linear: #83a598; --tactile: #fabd2f; --clicky: #fb4934;
+/* --- Shellac (dark warm) — deep red-brown lacquer, McIntosh / vintage radio --- */
+:root[data-finish='shellac'] {
+  --chassis: rgba(28, 17, 13, 0.84);
+  --chassis-tint: #160D0A;
+  --ink-1: #F0DCC6;
+  --ink-2: #B09284;
+  --hairline: rgba(255, 170, 110, 0.10);
+  --engrave-shadow: rgba(15, 5, 0, 0.45);
+  --engrave-highlight: rgba(255, 220, 180, 0.08);
+  --led-on: #E04B2C;
+  --led-dim: rgba(224, 75, 44, 0.30);
+  --led-mute: #5A2616;
+  --led-peak: #F4674A;
+  --interactive: #C84327;
+  --interactive-soft: rgba(200, 67, 39, 0.14);
+  --focus-ring: #C84327;
 }
 
+/* --- Indigo Linen (light cool) — engineering blueprint, Rams drafting paper --- */
+:root[data-finish='indigo-linen'] {
+  --chassis: rgba(220, 226, 236, 0.74);
+  --chassis-tint: #C9D1DD;
+  --ink-1: #1A2436;
+  --ink-2: #4A5A76;
+  --hairline: rgba(59, 74, 107, 0.15);
+  --engrave-shadow: rgba(30, 50, 80, 0.25);
+  --engrave-highlight: transparent;
+  --led-on: #3B4A6B;
+  --led-dim: rgba(59, 74, 107, 0.35);
+  --led-mute: #5A6478;
+  --led-peak: #5268A0;
+  --interactive: #354260;
+  --interactive-soft: rgba(53, 66, 96, 0.14);
+  --focus-ring: #354260;
+}
 
-/* =============================================
-   COMPONENTS
-   ============================================= */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
-*, *::before, *::after { box-sizing: border-box; }
-button { font-family: inherit; cursor: pointer; }
+button {
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+}
 
+/* ONYX v2.2 — Focus visible. 1px accent outline + 2px offset. Matches the
+   instrument metaphor (panel marking the active control), no glow. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r);
+}
+.finish-btn:focus-visible,
+.finish-auto:focus-visible,
+.preset-chip:focus-visible,
+.bed-chip:focus-visible,
+.drawer-btn:focus-visible,
+.drawer-tab:focus-visible {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight),
+    inset 0 0 0 1px var(--focus-ring);
+}
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--chassis), 0 0 0 3px var(--focus-ring);
+}
+@media (forced-colors: active) {
+  :focus-visible { outline: 2px solid CanvasText; }
+}
+
+/* Reduced motion — kill blinks / scale pulses / drawer transforms. Keep only
+   opacity transitions, compressed to ≤80ms. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 80ms !important;
+  }
+  .status-led.warn { outline: 1px solid var(--led-on); }
+  .app.warming { animation: warmup-fade-reduced 160ms ease forwards; }
+  .app.shutting { animation: shutdown-fade-reduced 80ms ease forwards; }
+  .help-panel, .tune-drawer { animation: none; }
+  .switch-name.swap-blackout { opacity: 0.6; }
+}
+@keyframes warmup-fade-reduced {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes shutdown-fade-reduced {
+  from { opacity: 1; } to { opacity: 0; }
+}
+
+/* ---- Root chassis ---- */
 .app {
+  position: relative;
   width: 100%;
-  height: 100vh;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  padding: 0 14px 12px;
+  min-height: 100vh;
+  background: var(--chassis);
   font-family: var(--font);
   font-size: 12px;
-  color: var(--text);
+  color: var(--ink-1);
   -webkit-user-select: none;
   user-select: none;
   -webkit-app-region: drag;
-  gap: 10px;
   -webkit-font-smoothing: antialiased;
-  transition: background 300ms ease, color 200ms ease;
+  overflow: hidden;
 }
 
-/* ---- Titlebar ---- */
-.titlebar {
+/* The measurement target. Natural height based on children — what the
+   auto-resize hook observes. Keeps the flex-column layout and chassis
+   padding that used to live on .app; .app is now just the chrome shell. */
+.app-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--s-6) var(--s-5);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ONYX v2 — Warmup. 920ms total. Chassis ink fades in 0→180; hairlines settle
+   220→920 (we just let them appear with opacity); Status LED runs its own
+   inhale via .status-led animation chained from .app.warming. Suppressed on
+   first launch until permission resolves (see App.tsx). */
+.app.warming {
+  animation: warmup-fade 920ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes warmup-fade {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* Shutdown — 400ms mirror. Played before window hides on blur. */
+.app.shutting {
+  animation: shutdown-fade 400ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes shutdown-fade {
+  0%   { opacity: 1; }
+  60%  { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+/* Material noise overlay — single texture, per-material grain comes through chassis tint */
+.app::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--noise-url);
+  mix-blend-mode: overlay;
+  opacity: var(--noise-opacity);
+  pointer-events: none;
+  z-index: 0;
+}
+.app > * { position: relative; z-index: 1; }
+
+/* =============================================
+   Engraving recipe — letter interior = chassis;
+   shadow + highlight pair fakes the cut edge.
+   12 px floor (smaller text uses solid --ink-* fill).
+   ============================================= */
+
+/* Pocket — pressed INTO material (state chips, mode chip, drawer chips) */
+.engraved-pocket {
+  border: 1px solid var(--hairline);
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+
+/* Boss — raised PROUD of material (primary action: TUNE, Done) */
+.engraved-boss {
+  border: 1px solid var(--hairline);
+  box-shadow:
+    inset 0 -1px 0 var(--engrave-shadow),    /* shadow on bottom edge */
+    inset 0  1px 0 var(--engrave-highlight); /* highlight on top edge */
+}
+
+/* Engraved label — vertical lighting (legibility at small sizes) */
+.engraved-label {
+  color: var(--chassis-tint);
+  text-shadow:
+    0  1px 0 var(--engrave-highlight),
+    0 -1px 0 var(--engrave-shadow);
+}
+
+/* Engraved hero — diagonal lighting (more dimensional at 28px) */
+.engraved-hero {
+  color: var(--chassis-tint);
+  text-shadow:
+    -1px -1px 0 var(--engrave-shadow),
+     1px  1px 0 var(--engrave-highlight);
+}
+
+/* ---- Top plate ---- */
+.top-plate {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+
+/* Status LED — pure state indicator (v2.5.1: no click, no tooltip, no button).
+   Shape + color encode state (see StatusLed.tsx). Idle pilot-lit with a 47 s
+   slow opacity drift — sole ambient rhythm on the chassis after the mode-chip
+   filament breath was removed in v2.6 (see mode-silkscreen-design). */
+.status-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--led-dim);
+  transition: background 180ms ease, width 180ms ease, height 180ms ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--chassis);
+  animation: pilot-drift 47s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  flex-shrink: 0;
+}
+
+.status-led.active {
+  background: var(--led-on);
+  animation: led-pulse 200ms ease-out, pilot-drift 47s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  /* No bloom — LEDs on real instruments don't shine THROUGH the chassis. */
+}
+
+.status-led.muted {
+  background: transparent;
+  border: 1.5px solid var(--led-mute);
+  animation: led-breathe 3s ease-in-out infinite;
+}
+
+.status-led.warn {
+  width: 12px;
+  height: 12px;
+  background: var(--led-mute);
+  color: var(--chassis-tint);
+  animation: none; /* Static — no blink (seizure-adjacent) */
+}
+.status-led.warn::after {
+  content: '!';
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+}
+
+@keyframes led-pulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@keyframes led-breathe {
+  0%, 100% { opacity: 0.40; }
+  50%      { opacity: 0.85; }
+}
+@keyframes pilot-drift {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1.00; }
+}
+
+/* ---- Help button + popover panel ---- */
+.help-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  -webkit-app-region: no-drag;
+}
+
+/* Slash Key — 18×18 keycap glyph of the `/` shortcut. Replaces v2.5's
+   near-invisible 10×1 hairline. Idle reads as a chassis label; hover/active
+   routes through --interactive so it behaves like any other actionable on
+   the panel. */
+.slash-key {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+.slash-key:hover,
+.slash-key:focus-visible {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  outline: none;
+}
+.slash-key:focus-visible {
+  box-shadow: 0 0 0 2px var(--chassis), 0 0 0 3px var(--focus-ring);
+}
+.slash-key.on {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
+}
+
+/* ONYX v2.3 — Help panel is "service mode": it fills the rest of the chassis
+   content area (below top-plate) instead of floating over it. No shadow, no
+   blur, same surface — the chassis flips to a reference card. */
+.help-panel {
+  padding: var(--s-4) 0 var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  animation: help-in 160ms cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+
+@keyframes help-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.help-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: var(--s-2);
+}
+
+.help-kbd-list {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  row-gap: var(--s-2);
+  column-gap: var(--s-3);
+  font-size: 11px;
+  font-family: var(--font);
+}
+
+.help-kbd {
+  color: var(--ink-1);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.help-kbd-use {
+  color: var(--ink-2);
+  letter-spacing: 0.5px;
+}
+
+.help-divider {
+  height: 1px;
+  background: var(--hairline);
+  border: none;
+  margin: 0;
+}
+
+.finish-auto {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px var(--s-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: transparent;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms, background 120ms;
+  margin-bottom: var(--s-2);
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+.finish-auto-sub {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: none;
+  color: var(--ink-2);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.finish-group-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.65;
+  margin: var(--s-3) 0 var(--s-2);
+}
+
+/* ONYX v2.5 — help-panel readout strip. Diagnostic info, no action.
+   Mirrors a Nagra-style front-panel status: quiet, tabular, always there. */
+.help-readout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.help-readout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.help-readout-label {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.65;
+}
+.help-readout-value {
+  color: var(--ink-2);
+  letter-spacing: 0.06em;
+}
+
+/* TYPING toggle — two-segment chip; matches .slash-key visual language but
+   wider, with a clear hairline divider between segments. */
+.repeat-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 2px 4px 68px;
-  -webkit-app-region: drag;
+  gap: var(--s-3);
 }
-
-.titlebar-left { display: flex; align-items: center; gap: 6px; }
-
-.titlebar-mascot {
-  flex-shrink: 0;
-  color: var(--accent);
-  opacity: 0.85;
-  transition: color 300ms, opacity 200ms;
-}
-.titlebar-mascot:hover { opacity: 1; }
-
-.titlebar h1 {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.3px;
-}
-
-.titlebar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 10px;
+.repeat-toggle-label {
+  font-family: var(--font);
+  font-size: 11px;
   font-weight: 500;
-  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  color: var(--ink-1);
 }
-
-.muted-badge {
-  font-size: 9px;
+.repeat-toggle-segments {
+  display: inline-flex;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.repeat-toggle-seg {
+  font-family: var(--font);
+  font-size: 10px;
   font-weight: 700;
-  color: var(--error);
-  background: rgba(243, 139, 168, 0.08);
-  padding: 2px 6px;
-  border-radius: var(--r-sm);
-  letter-spacing: 0.8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--ink-2);
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+.repeat-toggle-seg + .repeat-toggle-seg {
+  border-left: 1px solid var(--hairline);
+}
+.repeat-toggle-seg:hover { color: var(--interactive); }
+.repeat-toggle-seg.on {
+  color: var(--interactive);
+  background: var(--interactive-soft);
+}
+.repeat-toggle-seg:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+.repeat-toggle-caption {
+  margin-top: var(--s-2);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  opacity: 0.7;
+}
+.finish-auto:hover { color: var(--ink-1); }
+.finish-auto.on {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
 }
 
-/* ---- No-drag ---- */
-.current-profile, .controls, .permission-banner,
+.finish-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-2);
+}
+
+.finish-btn {
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: var(--s-2) 4px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  background: transparent;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms, background 120ms;
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+.finish-btn:hover { color: var(--ink-1); }
+.finish-btn.on {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
+}
+
+/* ---- Interaction hygiene ---- */
+.switch-block, .ladder, .fader, .tune-drawer,
 button, input[type='range'] {
   -webkit-app-region: no-drag;
 }
 
-/* ---- Profile Card ---- */
-.current-profile {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
-  border-radius: var(--r);
-  padding: 20px 16px;
-  text-align: center;
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.04);
-  transition: border-color 300ms ease;
-}
-
-.current-profile.accent-linear  { border-top-color: var(--linear); }
-.current-profile.accent-tactile { border-top-color: var(--tactile); }
-.current-profile.accent-clicky  { border-top-color: var(--clicky); }
-
-.profile-nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  justify-content: center;
-}
-
-.nav-btn {
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-0);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 0;
-  border-radius: 50%;
-  transition: all 120ms ease;
-}
-
-.nav-btn:hover {
-  color: var(--text);
-  background: var(--surface-1);
-  border-color: var(--border-focus);
-  transform: scale(1.08);
-}
-
-.nav-btn:active {
-  transform: scale(0.95);
-  background: var(--surface-2);
-}
-
-.profile-current-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.2px;
-  line-height: 1.3;
-  transition: color 200ms;
-}
-
-.profile-current-meta { display: flex; align-items: center; gap: 6px; }
-
-.type-badge {
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: var(--r-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  transition: color 200ms, background 200ms;
-}
-
-.type-linear  { color: var(--linear); background: rgba(137, 180, 250, 0.10); }
-.type-tactile { color: var(--tactile); background: rgba(250, 179, 135, 0.10); }
-.type-clicky  { color: var(--clicky); background: rgba(243, 139, 168, 0.10); }
-
-.hq-badge {
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--accent);
-  padding: 2px 7px;
-  border: 1px solid rgba(137, 180, 250, 0.18);
-  border-radius: var(--r-sm);
-  transition: color 200ms, border-color 200ms;
-}
-
-/* TUNE chip in profile card — sized to sit alongside type-badge / hq-badge */
-.tune-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  color: var(--text-muted);
-  background: var(--surface-0);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 2px 7px;
-  margin-left: 2px;
-  cursor: pointer;
-  transition: color 120ms, background 120ms, border-color 120ms, transform 80ms;
-}
-.tune-chip:hover {
-  color: var(--text);
-  background: var(--surface-1);
-  border-color: var(--border-focus);
-}
-.tune-chip:active { transform: translateY(1px); }
-.tune-chip-icon {
-  font-size: 11px;
-  line-height: 1;
-  color: var(--accent);
-}
-
-.profile-current-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  max-width: 240px;
-  line-height: 1.5;
-}
-
-.profile-counter {
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--text-dim);
-  letter-spacing: 1px;
-  margin-top: 2px;
-}
-
-/* ---- Controls ---- */
-.controls {
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 12px 14px;
-  gap: 12px;
-  box-shadow: var(--shadow);
-}
-
-.volume-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.volume-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-}
-
-.volume-value {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  transition: color 200ms;
-}
-
-input[type='range'] {
-  width: 100%;
-  height: 4px;
-  outline: none;
-  -webkit-appearance: none;
-  cursor: pointer;
+/* ---- Mode kicker (silkscreen label, demoted from chip v2.5) ---- */
+.mode-kicker {
+  /* button reset */
+  background: none;
   border: none;
-  border-radius: 2px;
-  background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--fill, 70%), var(--surface-2) var(--fill, 70%), var(--surface-2) 100%);
-  transition: background 150ms;
-}
-
-input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08);
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-
-input[type='range']::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.08);
-}
-
-input[type='range']::-webkit-slider-thumb:active { transform: scale(1.05); }
-
-/* ---- Mode (primary axis, same nav pattern as profile) ---- */
-.mode-group {
+  font: inherit;
+  margin: 0;
+  /* layout */
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  -webkit-app-region: no-drag;
-}
-
-.mode-nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.mode-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  min-width: 96px;
-  text-align: center;
-  transition: color 200ms ease;
-}
-
-.mode-description {
-  font-size: 10px;
-  line-height: 1.4;
-  color: var(--text-muted);
-  text-align: center;
-  padding: 0 6px;
-  min-height: 26px;
-  max-width: 240px;
-  transition: color 200ms ease;
-}
-
-/* ---- Tune view (per-switch DSP + Custom mode soundscape) ---- */
-.tune-view {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  padding: 14px 14px 10px;
-  gap: 8px;
-  font-family: var(--font);
-  color: var(--text);
-  -webkit-user-select: none;
+  padding: var(--s-4) 0 0;
+  flex-shrink: 0;
+  /* reveal */
+  opacity: 0.55;
+  cursor: pointer;
   user-select: none;
+  transition: opacity 200ms ease;
 }
 
-.tune-header {
+.mode-kicker.revealed,
+.mode-kicker:hover,
+.mode-kicker:focus-visible {
+  opacity: 1;
+  outline: none;
+}
+
+.mode-kicker-name {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: color 150ms ease;
+  /* compensate for trailing letter-spacing on the final char */
+  padding-left: 0.36em;
+}
+
+.mode-kicker:hover .mode-kicker-name,
+.mode-kicker:focus-visible .mode-kicker-name {
+  color: var(--ink-2);
+}
+
+.mode-kicker-dot {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.mode-kicker-arrow {
+  font-size: 10px;
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.mode-kicker:hover .mode-kicker-arrow,
+.mode-kicker:focus-visible .mode-kicker-arrow {
+  opacity: 1;
+}
+
+
+/* ---- Switch hero ---- */
+.switch-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding-top: var(--s-2);
+  padding-bottom: var(--s-5);
+  flex-shrink: 0;
+}
+
+.switch-name {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.15;
+  transition: opacity 100ms ease;
+  /* Engraved hero — letter interior = chassis-tint, edges catch light */
+  color: var(--chassis-tint);
+  text-shadow:
+    -1px -1px 0 var(--engrave-shadow),
+     1px  1px 0 var(--engrave-highlight);
+}
+/* Used by finish-swap: opacity 1→0→1 around 320ms cross-dissolve */
+.switch-name.swap-blackout { opacity: 0; }
+
+.switch-nav-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 0 6px;
-  border-bottom: 1px solid var(--border);
-  -webkit-app-region: drag;
+  justify-content: center;
+  gap: var(--s-6);
+  margin-top: var(--s-1);
 }
 
-.tune-back, .tune-reset {
-  -webkit-app-region: no-drag;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  padding: 4px 8px;
-  border-radius: var(--r-sm);
-  transition: color 120ms, background 120ms;
+.switch-nav {
+  font-size: 16px;
+  color: var(--ink-2);
+  padding: var(--s-1) var(--s-2);
+  transition: color 120ms ease;
 }
-.tune-back { font-size: 18px; padding: 0 8px; }
-.tune-back:hover, .tune-reset:hover {
-  color: var(--text);
-  background: var(--surface-1);
-}
+.switch-nav:hover { color: var(--ink-1); }
 
-.tune-title {
+.switch-meta {
   font-size: 11px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 1.2px;
+  font-weight: 400;
+  letter-spacing: 1.6px;
   text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.5;
+  transition: opacity 300ms ease;
+}
+.switch-meta.visible { opacity: 1; }
+
+.switch-desc {
+  font-size: 12px;
+  color: var(--ink-2);
+  text-align: center;
+  max-width: 280px;
+  line-height: 1.45;
 }
 
-.tune-body {
-  flex: 1;
-  overflow-y: auto;
+/* ONYX v2.2 — inline warn panel replaces .switch-desc when needsPermission /
+   bluetoothWarning is true. Surfaces the problem at the centroid of the UI
+   instead of behind a hover tooltip on the 6 px Status LED. */
+.warn-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 4px 2px;
-  -webkit-app-region: no-drag;
-}
-
-/* === Flavor / Pro tab bar === */
-.tune-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 2px;
-  background: var(--surface-0);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  -webkit-app-region: no-drag;
-}
-.tune-tab {
-  flex: 1;
-  font-family: var(--font);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  background: transparent;
-  border: none;
-  padding: 6px 8px;
-  border-radius: calc(var(--r-sm) - 1px);
-  cursor: pointer;
-  transition: color 120ms, background 120ms;
-}
-.tune-tab:hover { color: var(--text-muted); }
-.tune-tab.on {
-  color: var(--text);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--border-focus);
-}
-
-/* === Flavor cards === */
-.flavor-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.flavor-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px 12px 14px;
-  font-family: var(--font);
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: 1px solid var(--led-mute);
+  border-radius: var(--r);
+  max-width: 280px;
+  margin-top: var(--s-2);
   text-align: left;
-  background: var(--surface-0);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  transition: background 120ms, border-color 120ms, transform 80ms;
 }
-.flavor-card:hover {
-  background: var(--surface-1);
-  border-color: var(--border-focus);
-}
-.flavor-card:active { transform: translateY(1px); }
-.flavor-card.on {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.flavor-card-name {
-  font-size: 13px;
+.warn-panel-title {
+  font-size: 10px;
   font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--led-mute);
 }
-.flavor-card.on .flavor-card-name { color: var(--accent); }
-
-.flavor-card-desc {
-  font-size: 10px;
-  color: var(--text-dim);
-  line-height: 1.35;
+.warn-panel-body {
+  font-size: 11px;
+  color: var(--ink-2);
+  line-height: 1.45;
 }
-
-.flavor-card-dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  border-radius: 50%;
-  box-shadow: 0 0 6px var(--accent);
-}
-
-.flavor-custom-note {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10px;
-  color: var(--text-muted);
-  padding: 8px 12px;
-  background: var(--surface-0);
-  border: 1px dashed var(--border);
-  border-radius: var(--r-sm);
-}
-.flavor-revert {
+.warn-panel-action {
+  align-self: flex-start;
+  margin-top: var(--s-1);
   font-family: var(--font);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--ink-1);
   background: transparent;
-  border: 1px solid var(--border-focus);
-  border-radius: var(--r-sm);
-  padding: 3px 8px;
+  border: 1px solid var(--led-mute);
+  border-radius: var(--r);
+  padding: 5px var(--s-3);
   cursor: pointer;
-  transition: background 120ms;
-}
-.flavor-revert:hover { background: var(--accent-soft); }
-
-.tune-section {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding-bottom: 6px;
-}
-.tune-section + .tune-section {
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-}
-
-.tune-section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 16px;
-}
-
-.tune-section-reset {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: var(--r-sm);
-  transition: color 120ms, background 120ms;
-}
-.tune-section-reset:hover {
-  color: var(--text);
-  background: var(--surface-1);
-}
-
-.tune-mode-hint {
-  font-size: 10px;
-  color: var(--text-dim);
-  padding: 6px 8px;
-  background: var(--surface-0);
-  border: 1px dashed var(--border);
-  border-radius: var(--r-sm);
-}
-.tune-mode-hint strong { color: var(--text-muted); }
-
-.tune-locked { opacity: 0.45; pointer-events: none; }
-
-.tune-row.disabled { opacity: 0.5; }
-.tune-row input[type="range"]:disabled { cursor: not-allowed; }
-
-.tune-header-spacer { width: 32px; }
-
-.tune-section-label,
-.tune-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.tune-bed-options {
-  display: flex;
-  gap: 4px;
-}
-.tune-bed-chip {
-  flex: 1;
-  padding: 5px 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  background: var(--surface-0);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
   transition: color 120ms, background 120ms, border-color 120ms;
 }
-.tune-bed-chip:hover {
-  color: var(--text);
-  background: var(--surface-1);
-}
-.tune-bed-chip.on {
-  color: var(--text);
-  background: var(--accent-soft);
-  border-color: var(--border-focus);
+.warn-panel-action:hover {
+  background: var(--led-mute);
+  color: var(--chassis);
 }
 
-.tune-row {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+/* ---- Hairline divider ---- */
+.rule {
+  height: 1px;
+  background: var(--hairline);
+  border: none;
+  margin: var(--s-4) 0 0;    /* gap-before s-4 */
+  flex-shrink: 0;
 }
+/* When rule sits between fader and TUNE, soften it to 50% so TUNE feels
+   *connected* to the control block above, not isolated as its own footer. */
+.rule.soft { opacity: 0.5; }
 
-.tune-row-head {
+/* ---- DSP Warmth Arc ---- */
+.warmth-arc {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-}
-
-.tune-value {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.tune-footer {
-  font-size: 9px;
-  text-align: center;
-  color: var(--text-dim);
-  padding: 4px 0 2px;
-  letter-spacing: 0.3px;
-}
-
-/* ---- Typing indicator ---- */
-.typing-indicator {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 10px;
-  height: 20px;
-  transition: opacity 300ms;
-}
-
-.typing-dots { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
-
-.typing-dot {
-  width: 3px;
-  height: 100%;
-  background: var(--surface-2);
-  border-radius: 1.5px;
-  transform-origin: bottom;
-  transform: scaleY(0.1);
-  transition: transform 180ms ease-out, background 120ms;
-}
-
-.typing-dot.active {
-  background: var(--accent);
-  box-shadow: 0 0 4px rgba(137, 180, 250, 0.15);
-}
-
-.typing-dot:nth-child(1).active { transform: scaleY(0.45); }
-.typing-dot:nth-child(2).active { transform: scaleY(0.80); }
-.typing-dot:nth-child(3).active { transform: scaleY(1.00); }
-.typing-dot:nth-child(4).active { transform: scaleY(0.60); }
-.typing-dot:nth-child(5).active { transform: scaleY(0.35); }
-
-.typing-wpm {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.typing-wpm.fast { color: var(--success); }
-
-/* ---- Footer ---- */
-.footer {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--text-dim);
-  letter-spacing: 0.3px;
-  transition: color 200ms;
-}
-
-.footer-theme {
-  color: var(--text-muted);
-  min-width: 76px;
-  text-align: center;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  transition: color 200ms ease;
-}
-
-.footer-nav-btn {
+  height: 60px;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
-  width: 16px;
+}
+
+/* ---- LED intensity ladder ---- */
+.ladder {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--s-4) 0 0;   /* gap-before s-4; gap-after via fader pad-top */
+  flex-shrink: 0;
+  height: 20px;              /* committed v2.2 — exact rhythm */
+}
+
+/* v2.1 hierarchy fix: segments default to ink-2 ghosted at rest;
+   --led-on only on currently-firing segments. Ladder no longer competes
+   with the engraved switch hero for visual weight. */
+.ladder-seg {
+  flex: 1;
+  height: 12px;
+  background: var(--ink-2);
+  opacity: 0.18;
+  border-radius: 1px;
+  transition: background 160ms ease, opacity 160ms ease;
+}
+
+.ladder-seg.on   { background: var(--led-on); opacity: 1; }
+.ladder-seg.tail { background: var(--led-dim); opacity: 1; }
+.ladder-seg.peak { background: var(--led-peak); opacity: 1; }
+
+.ladder.muted .ladder-seg {
+  background: var(--led-mute);
+  opacity: 0.40;
+}
+
+/* ---- Volume fader ---- */
+.fader {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) 0 0;   /* gap-before s-3; gap-after via rule margin-top */
+  flex-shrink: 0;
+}
+
+.fader-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+
+.fader-track {
+  flex: 1;
+  position: relative;
   height: 16px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: transparent;
+}
+
+.fader-track input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right,
+    var(--interactive) 0%,
+    var(--interactive) var(--fill, 70%),
+    var(--hairline) var(--fill, 70%),
+    var(--hairline) 100%);
   border: none;
-  color: var(--text-dim);
-  font-size: 11px;
-  padding: 0;
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
+
+.fader-track input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  transition: color 120ms, background 120ms;
+  background: var(--ink-1);
+  border: none;
+  cursor: pointer;
+  transition: transform 120ms ease;
 }
-.footer-nav-btn:hover {
-  color: var(--text);
-  background: var(--surface-1);
+.fader-track input[type='range']::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.fader-track input[type='range']::-webkit-slider-thumb:active { transform: scale(1.05); }
+
+.fader-ticks {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: -1;
+}
+.fader-tick {
+  width: 1px;
+  height: 3px;
+  background: var(--hairline);
+}
+.fader-tick.major { height: 5px; }
+
+.fader-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
-/* ---- Alerts ---- */
-.permission-banner {
-  background: rgba(243,139,168,0.04);
-  border: 1px solid rgba(243,139,168,0.08);
-  border-left: 2px solid var(--error);
-  border-radius: var(--r);
-  padding: 10px 12px;
+
+/* ---- Tune drawer ---- */
+.tune-drawer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  /* ONYX v2.2 — drawer body stays inert during the 460ms open animation so
+     a fast click can't land on a slider rail mid-flight. pointer-events is
+     animatable as a discrete property — flips at 99% to 'auto'. */
+  pointer-events: none;
+  animation: drawer-in 460ms cubic-bezier(0.32, 0.72, 0.24, 1) forwards;
+}
+
+@keyframes drawer-in {
+  0%   { opacity: 0; transform: translateY(-6px); pointer-events: none; }
+  99%  { pointer-events: none; }
+  100% { opacity: 1; transform: translateY(0); pointer-events: auto; }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-3) 0 var(--s-2);
+  border-top: 1px solid var(--hairline);
+  box-shadow: inset 0 2px 0 0 transparent, 0 1px 0 var(--hairline);
+  margin-top: var(--s-2);
+}
+
+.drawer-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.drawer-tabs {
+  display: flex;
+  gap: var(--s-3);
+}
+.drawer-tab {
+  font-family: var(--font);
   font-size: 11px;
-  color: var(--text);
-  box-shadow: var(--shadow);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 120ms, border-color 120ms;
+}
+.drawer-tab:hover { color: var(--ink-1); }
+.drawer-tab.on {
+  color: var(--ink-1);
+  border-bottom-color: var(--led-on);
+}
+/* Subtitle under active tab — disambiguates Switch/Mode terms */
+.drawer-tab-sub {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.65;
+  text-align: right;
+  padding: 2px 0 var(--s-2);
 }
 
-.permission-title {
-  font-size: 10px; font-weight: 700; color: var(--error);
-  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.8px;
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-4) 0 var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
 }
 
-.permission-btn {
-  font-size: 10px; font-weight: 700; padding: 5px 14px; margin-top: 8px;
-  background: var(--error); color: #fff; border: none;
-  border-radius: var(--r-sm); transition: all 120ms ease;
+.drawer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-3) 0 0;
+  border-top: 1px solid var(--hairline);
+  flex-shrink: 0;
 }
 
-.permission-btn:hover { filter: brightness(1.12); transform: translateY(-0.5px); }
-.permission-btn:active { transform: translateY(0); filter: brightness(0.95); }
-
-.bluetooth-warning {
-  background: rgba(137,180,250,0.04);
-  border: 1px solid rgba(137,180,250,0.08);
-  border-left: 2px solid var(--linear);
-  border-radius: var(--r);
-  padding: 8px 12px;
+.drawer-btn {
+  font-family: var(--font);
   font-size: 11px;
-  color: var(--text-muted);
-  box-shadow: var(--shadow);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 6px var(--s-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  transition: color 120ms, border-color 120ms;
+  /* Default Reset = pocket */
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+.drawer-btn:hover { color: var(--ink-1); border-color: var(--interactive); }
+.drawer-btn.primary {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  /* Done = boss (raised, like TUNE) */
+  box-shadow:
+    inset 0 -1px 0 var(--engrave-shadow),
+    inset 0  1px 0 var(--engrave-highlight);
 }
 
-/* ---- Loading ---- */
+/* ---- Preset chips (SWITCH tab) ---- */
+.preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  padding-bottom: var(--s-2);
+}
+.preset-chip {
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 5px var(--s-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  transition: color 120ms, border-color 120ms, background 120ms;
+  /* Pocket — state chip pressed into chassis */
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+.preset-chip:hover { color: var(--ink-1); }
+.preset-chip.on {
+  color: var(--interactive);
+  border-color: var(--interactive);
+  background: var(--interactive-soft);
+}
+
+/* ---- Slider rows ---- */
+.slider-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 72px;
+  align-items: center;
+  gap: var(--s-3);
+}
+.slider-row.disabled { opacity: 0.4; pointer-events: none; }
+
+.slider-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.slider-row input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right,
+    var(--interactive) 0%,
+    var(--interactive) var(--fill, 50%),
+    var(--hairline) var(--fill, 50%),
+    var(--hairline) 100%);
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
+.slider-row input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--ink-1);
+  cursor: pointer;
+}
+
+.slider-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ---- Bed option chips (MODE tab) ---- */
+.bed-chips {
+  display: flex;
+  gap: var(--s-2);
+}
+.bed-chip {
+  flex: 1;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  transition: color 120ms, border-color 120ms;
+  box-shadow:
+    inset 0  1px 0 var(--engrave-shadow),
+    inset 0 -1px 0 var(--engrave-highlight);
+}
+.bed-chip:hover { color: var(--ink-1); }
+.bed-chip.on {
+  color: var(--interactive);
+  border-color: var(--interactive);
+}
+
+.mode-hint {
+  font-size: 11px;
+  color: var(--ink-2);
+  padding: var(--s-3);
+  border: 1px dashed var(--hairline);
+  border-radius: var(--r);
+  line-height: 1.5;
+}
+.mode-hint strong { color: var(--ink-2); }
+
+.drawer-compact-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) 0 var(--s-3);
+}
+/* Refactoring-ui §A4: rebalance — fader needs more room than ladder when paired,
+   because the VOL label + value chrome eats ~80px before the track starts. */
+.drawer-compact-row .ladder { padding: 0; flex: 3; }
+.drawer-compact-row .fader  { padding: 0; flex: 4; }
+
+/* ---- Loading state ---- */
 .loading {
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-muted); font-size: 11px; padding: 20px;
+  font-size: 11px;
+  color: var(--ink-2);
+  text-align: center;
+  padding: var(--s-5);
 }
-
-.loading::after { content: '_'; animation: blink 1s step-end infinite; }
-
+.loading::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+}
 @keyframes blink {
-  0%, 49% { opacity: 1; }
+  0%, 49%   { opacity: 1; }
   50%, 100% { opacity: 0; }
 }

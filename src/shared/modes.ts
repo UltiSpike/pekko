@@ -1,5 +1,5 @@
 export type BedType = 'none' | 'brown' | 'pink'
-export type StyleLevel = 'minimal' | 'soft' | 'full' | 'deep'
+export type StyleLevel = 'minimal' | 'soft' | 'full' | 'deep' | 'rush'
 
 // === Per-switch DSP ===
 // Each switch has a curated DSP preset (in profiles/index.json). Users can override
@@ -141,6 +141,7 @@ export interface Mode {
   bed: BedType
   bedGainDb: number
   style: ModeStyle
+  arcadeEnabled: boolean
 }
 
 const STYLE: Record<StyleLevel, ModeStyle> = {
@@ -182,6 +183,18 @@ const STYLE: Record<StyleLevel, ModeStyle> = {
     lowShelfDb: 5.0,
     wetMix: 0.18,
   },
+  // "Rush" — bright, dry, light body. Leaves 180Hz headroom for arcade overlay kick,
+  // keeps 14kHz air open so hi-hat overlay cuts through. intensityLocked so combo
+  // stays the sole escalation axis; per-key velocity doesn't double-count energy.
+  rush: {
+    pitchJitter: 0.010,
+    volumeJitter: 0.05,
+    intensityLocked: true,
+    airLpfHz: 14000,
+    highShelfDb: 1.5,
+    lowShelfDb: 1.5,
+    wetMix: 0.10,
+  },
 }
 
 // Custom mode starts as a copy of Thock. Users tune from there; values persisted in AppSettings.
@@ -200,7 +213,12 @@ export const CUSTOM_RANGE = {
   bedGainDb:    { min: -50,   max: -28,   step: 1 },
 } as const
 
-export function buildCustomMode(style: ModeStyle, bed: BedType, bedGainDb: number): Mode {
+export function buildCustomMode(
+  style: ModeStyle,
+  bed: BedType,
+  bedGainDb: number,
+  arcadeEnabled: boolean,
+): Mode {
   return {
     id: 'custom',
     name: 'Custom',
@@ -209,6 +227,7 @@ export function buildCustomMode(style: ModeStyle, bed: BedType, bedGainDb: numbe
     bed,
     bedGainDb,
     style,
+    arcadeEnabled,
   }
 }
 
@@ -221,6 +240,7 @@ export const MODES: Mode[] = [
     bed: 'brown',
     bedGainDb: -38,
     style: STYLE.minimal,
+    arcadeEnabled: false,
   },
   {
     id: 'cozy-writing',
@@ -230,6 +250,7 @@ export const MODES: Mode[] = [
     bed: 'pink',
     bedGainDb: -40,
     style: STYLE.soft,
+    arcadeEnabled: false,
   },
   {
     id: 'thock',
@@ -239,6 +260,7 @@ export const MODES: Mode[] = [
     bed: 'none',
     bedGainDb: -80,
     style: STYLE.deep,
+    arcadeEnabled: false,
   },
   {
     id: 'classic-mech',
@@ -248,6 +270,17 @@ export const MODES: Mode[] = [
     bed: 'none',
     bedGainDb: -80,
     style: STYLE.full,
+    arcadeEnabled: false,
+  },
+  {
+    id: 'rush',
+    name: 'Rush',
+    subtitle: 'Combo overlay · momentum HUD',
+    description: 'Percussive hits stack with combo, pulse tracks the flow. Built for sprints, not marathons.',
+    bed: 'none',
+    bedGainDb: -80,
+    style: STYLE.rush,
+    arcadeEnabled: true,
   },
 ]
 

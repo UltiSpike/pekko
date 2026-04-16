@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
-import { getSettings, setProfile, setVolume, setTheme, setMode, setCustomConfig, setSwitchDspOverride } from './store'
+import { getSettings, setProfile, setVolume, setMode, setIsTuning, setFinish, setUiSounds, setCustomConfig, setSwitchDspOverride, setHoldRepeat } from './store'
 import type { BedType, ModeStyle, SwitchDspOverride } from '../shared/modes'
+import type { Finish, HoldRepeatMode } from '../shared/types'
 import { checkAccessibilityPermission, requestAccessibilityPermission } from './permissions'
-import { rebuildTrayMenu } from './tray'
+import { rebuildTrayMenu, updateArcadeHud, ArcadeHudState } from './tray'
 
 const ROOT = path.join(__dirname, '..', '..')
 
@@ -94,7 +95,14 @@ function loadSoundPack(profileId: string): { config: any; spriteData?: Uint8Arra
   return null
 }
 
-export function registerIpcHandlers(): void {
+type Hooks = {
+  onTuningChange?: (isTuning: boolean) => void
+  onResize?: (height: number) => void
+  onHelpOpenChange?: (open: boolean) => void
+  onHoldRepeatChange?: (mode: HoldRepeatMode) => void
+}
+
+export function registerIpcHandlers(hooks: Hooks = {}): void {
   ipcMain.handle('get-settings', () => getSettings())
 
   ipcMain.handle('get-profiles', () => {
@@ -132,9 +140,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('set-profile', (_event, id: string) => { setProfile(id); rebuildTrayMenu(); return true })
   ipcMain.handle('set-volume', (_event, v: number) => { setVolume(v); rebuildTrayMenu(); return true })
-  ipcMain.handle('set-theme', (_event, t: string) => { setTheme(t); rebuildTrayMenu(); return true })
   ipcMain.handle('set-mode', (_event, m: string) => { setMode(m); return true })
-  ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle }) => {
+  ipcMain.handle('set-is-tuning', (_event, t: boolean) => { setIsTuning(t); hooks.onTuningChange?.(t); return true })
+  ipcMain.handle('set-finish', (_event, f: Finish) => { setFinish(f); rebuildTrayMenu(); return true })
+  ipcMain.handle('set-ui-sounds', (_event, enabled: boolean) => { setUiSounds(enabled); rebuildTrayMenu(); return true })
+  ipcMain.handle('set-custom-config', (_event, cfg: { bed: BedType; bedGainDb: number; style: ModeStyle; arcadeEnabled: boolean }) => {
     setCustomConfig(cfg)
     return true
   })
@@ -144,4 +154,26 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('check-permissions', () => checkAccessibilityPermission())
   ipcMain.handle('request-permissions', () => { requestAccessibilityPermission(); return true })
+  ipcMain.handle('resize-window', (_event, h: number) => {
+    if (typeof h !== 'number' || !Number.isFinite(h)) return false
+    hooks.onResize?.(h)
+    return true
+  })
+  ipcMain.handle('set-help-open', (_event, open: boolean) => {
+    hooks.onHelpOpenChange?.(!!open)
+    return true
+  })
+  ipcMain.handle('set-hold-repeat', (_event, mode: HoldRepeatMode) => {
+    if (mode !== 'off' && mode !== 'edit' && mode !== 'global') return false
+    setHoldRepeat(mode)
+    rebuildTrayMenu()
+    hooks.onHoldRepeatChange?.(mode)
+    return true
+  })
+
+  // Arcade HUD — one-way fire-and-forget from renderer. No invoke/reply to
+  // avoid round-trip latency on the audio hot path.
+  ipcMain.on('update-arcade-hud', (_event, state: ArcadeHudState) => {
+    updateArcadeHud(state)
+  })
 }

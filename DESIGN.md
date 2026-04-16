@@ -101,6 +101,6 @@ Individual audio files per key (e.g., `q.wav`, `space.wav`). More flexible, larg
 
 ## UI Design
 
-Pekko uses [NES.css](https://nostalgic-css.github.io/NES.css/) for a retro pixel-art aesthetic. The window uses macOS vibrancy (`under-window`) with a hidden title bar for a clean, native feel. The window hides on blur (acts as a popover from the tray icon).
+See [docs/design/CHASSIS.md](docs/design/CHASSIS.md) for the current design system — tokens, layout, interaction contract.
 
-Six color themes are supported via CSS custom properties on `[data-theme]`, switchable with `Q`/`E` keys.
+Pekko follows a single instrument-panel aesthetic: one matte chassis, one accent (amber LED), system-driven light/dark. JetBrains Mono throughout. The window (360×480, grows to 360×720 when the Tune drawer opens) hides on blur and acts as a popover from the menu bar tray icon.

@@ -1,9 +1,12 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useProfiles } from './hooks/useProfiles'
+import { useAutoResizeWindow } from './hooks/useAutoResizeWindow'
 import VolumeSlider from './components/VolumeSlider'
-import PermissionBanner from './components/PermissionBanner'
-import TypingIndicator from './components/TypingIndicator'
+import LedLadder from './components/LedLadder'
+import DspWarmthArc from './components/DspWarmthArc'
+import StatusLed from './components/StatusLed'
+import HelpPanel from './components/HelpPanel'
 import TuneView from './components/TuneView'
 import {
   MODES,
@@ -18,71 +21,121 @@ import {
   ModeStyle,
   SwitchDspOverride,
 } from '@shared/modes'
+import { Finish, FINISHES, HoldRepeatMode } from '@shared/types'
+import { playDrawerOpen, playDrawerClose, playMuteToggle } from './audio/uiSounds'
 import './App.css'
 
 const hasApi = typeof window !== 'undefined' && !!window.api
-
-const THEMES = [
-  { id: 'catppuccin', name: 'Catppuccin' },
-  { id: 'tokyo-night', name: 'Tokyo Night' },
-  { id: 'rose-pine', name: 'Rosé Pine' },
-  { id: 'nord', name: 'Nord' },
-  { id: 'dracula', name: 'Dracula' },
-  { id: 'gruvbox', name: 'Gruvbox' },
-] as const
-
-// mode IDs for cycling: all presets + custom at the end
 const MODE_IDS = [...MODES.map(m => m.id), 'custom']
+const META_REVEAL_MS = 1500
 
 export default function App() {
   const { profiles, loading } = useProfiles()
   const [activeProfile, setActiveProfile] = useState('cherrymx-black-abs')
   const [volume, setVolume] = useState(0.7)
   const [hasPermission, setHasPermission] = useState(true)
-  const [theme, setTheme] = useState('gruvbox')
   const [mode, setMode] = useState<string>(DEFAULT_MODE_ID)
 
-  // Custom mode state (persisted)
   const [customBed, setCustomBed] = useState<BedType>(DEFAULT_CUSTOM_BED)
   const [customBedGainDb, setCustomBedGainDb] = useState<number>(DEFAULT_CUSTOM_BED_GAIN_DB)
   const [customStyle, setCustomStyle] = useState<ModeStyle>({ ...DEFAULT_CUSTOM_STYLE })
+  const [customArcadeEnabled, setCustomArcadeEnabled] = useState<boolean>(false)
 
-  // Per-switch DSP overrides keyed by profileId. Sparse: only fields the user touched.
   const [switchDspOverrides, setSwitchDspOverrides] = useState<Record<string, SwitchDspOverride>>({})
 
   const [isTuning, setIsTuning] = useState(false)
+  const [finish, setFinish] = useState<Finish>('auto')
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [metaVisible, setMetaVisible] = useState(false)
+  // Warmup state machine: 'pending' = waiting for permission; 'running' = animation in flight;
+  // 'idle' = done. On first launch with no permission, stays pending until grant; on subsequent
+  // launches with permission, plays once on mount.
+  const [warmupPhase, setWarmupPhase] = useState<'pending' | 'running' | 'idle'>('pending')
+  const [shuttingDown, setShuttingDown] = useState(false)
+  const warmupPlayedRef = useRef(false)
+  const [uiSounds, setUiSounds] = useState(false)
+  const [holdRepeat, setHoldRepeatState] = useState<HoldRepeatMode>('off')
+  const lastSoundEnabledRef = useRef(true)
+  const metaTimerRef = useRef<number | null>(null)
+  const appRef = useRef<HTMLDivElement | null>(null)
+  useAutoResizeWindow(appRef, !shuttingDown)
 
-  // Resolved active Mode (object) — memoized so the engine effect doesn't re-run on every render
   const activeMode = useMemo(() => {
-    if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb)
+    if (mode === 'custom') return buildCustomMode(customStyle, customBed, customBedGainDb, customArcadeEnabled)
     return MODES.find(m => m.id === mode) ?? MODES[0]
-  }, [mode, customStyle, customBed, customBedGainDb])
+  }, [mode, customStyle, customBed, customBedGainDb, customArcadeEnabled])
 
   const activeProfileObj = profiles.find(p => p.id === activeProfile)
   const presetDsp = activeProfileObj?.dsp ?? DEFAULT_SWITCH_DSP
   const overrideForActive = switchDspOverrides[activeProfile]
-  // Memoized so the engine effect only fires when the resolved DSP actually changes.
   const effectiveDsp = useMemo(
     () => resolveSwitchDsp(activeProfileObj?.dsp, overrideForActive),
     [activeProfileObj, overrideForActive]
   )
 
-  const { bluetoothWarning, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode, effectiveDsp)
+  const { outputInfo, soundEnabled, wpm, typingActive } = useAudioEngine(activeProfile, volume, activeMode, effectiveDsp)
 
-  // Load persisted settings
+  // Reveal meta line briefly after keyboard navigation
+  const flashMeta = useCallback(() => {
+    setMetaVisible(true)
+    if (metaTimerRef.current) window.clearTimeout(metaTimerRef.current)
+    metaTimerRef.current = window.setTimeout(() => setMetaVisible(false), META_REVEAL_MS)
+  }, [])
+
   useEffect(() => {
     if (!hasApi) return
     window.api.getSettings().then((s) => {
       setActiveProfile(s.activeProfile)
       setVolume(s.volume)
-      if (s.theme) setTheme(s.theme)
       if (s.mode) setMode(s.mode)
+      if (typeof s.isTuning === 'boolean') setIsTuning(s.isTuning)
+      if (s.finish) setFinish(s.finish)
+      if (typeof s.uiSounds === 'boolean') setUiSounds(s.uiSounds)
+      if (s.holdRepeat === 'off' || s.holdRepeat === 'edit' || s.holdRepeat === 'global') {
+        setHoldRepeatState(s.holdRepeat)
+      } else if (typeof s.holdRepeat === 'boolean') {
+        // Cold migration: a stored boolean arrives before main's mergeSettings
+        // rewrites it. Map identically to the main-side rule.
+        setHoldRepeatState(s.holdRepeat ? 'edit' : 'off')
+      }
       if (s.customBed) setCustomBed(s.customBed)
       if (typeof s.customBedGainDb === 'number') setCustomBedGainDb(s.customBedGainDb)
       if (s.customStyle) setCustomStyle(s.customStyle)
+      if (typeof s.customArcadeEnabled === 'boolean') setCustomArcadeEnabled(s.customArcadeEnabled)
       if (s.switchDspOverrides) setSwitchDspOverrides(s.switchDspOverrides)
     }).catch(console.error)
   }, [])
+
+  // Apply finish to <html>
+  useEffect(() => {
+    document.documentElement.setAttribute('data-finish', finish)
+  }, [finish])
+
+  // Warmup gate — play once when permission is OK. On first launch with no
+  // permission this defers until grant; on subsequent launches it fires immediately.
+  useEffect(() => {
+    if (warmupPlayedRef.current) return
+    if (warmupPhase !== 'pending') return
+    if (!hasPermission) return
+    warmupPlayedRef.current = true
+    setWarmupPhase('running')
+    const t = window.setTimeout(() => setWarmupPhase('idle'), 920)
+    return () => clearTimeout(t)
+  }, [hasPermission, warmupPhase])
+
+  // Shutdown — main process tells us before hiding. Add .shutting class for 400ms.
+  useEffect(() => {
+    if (!hasApi) return
+    window.api.onBeforeHide?.(() => {
+      setShuttingDown(true)
+      window.setTimeout(() => setShuttingDown(false), 420)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!hasApi) return
+    window.api.setHelpOpen(helpOpen).catch(() => {})
+  }, [helpOpen])
 
   useEffect(() => {
     if (!hasApi) return
@@ -92,59 +145,98 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
-  // Listen for tray menu changes
   useEffect(() => {
     if (!hasApi) return
-    window.api.onProfileChanged(setActiveProfile)
+    window.api.onProfileChanged((id) => { setActiveProfile(id); flashMeta() })
     window.api.onVolumeChanged(setVolume)
-    window.api.onThemeChanged(setTheme)
+    window.api.onFinishChanged((f) => setFinish(f as Finish))
+    window.api.onUiSoundsChanged((enabled) => setUiSounds(enabled))
+  }, [flashMeta])
+
+  useEffect(() => {
+    if (!hasApi) return
+    window.api.onHoldRepeatChanged?.(setHoldRepeatState)
   }, [])
 
-  // Apply theme to DOM
+  // UI sound: mute toggle. Driven by the soundEnabled signal coming from
+  // useAudioEngine — fires once per state change, after Warmup completes.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+    if (!uiSounds || warmupPhase !== 'idle') {
+      lastSoundEnabledRef.current = soundEnabled
+      return
+    }
+    if (lastSoundEnabledRef.current !== soundEnabled) {
+      lastSoundEnabledRef.current = soundEnabled
+      try { playMuteToggle() } catch { /* AudioContext gated, ignore */ }
+    }
+  }, [soundEnabled, uiSounds, warmupPhase])
 
   const handleProfileChange = useCallback(async (id: string) => {
     setActiveProfile(id)
+    flashMeta()
     if (hasApi) await window.api.setProfile(id)
-  }, [])
+  }, [flashMeta])
 
   const handleVolumeChange = async (v: number) => {
     setVolume(v)
     if (hasApi) await window.api.setVolume(v)
   }
 
-  const handleThemeChange = useCallback(async (id: string) => {
-    setTheme(id)
-    if (hasApi) await window.api.setTheme(id)
-  }, [])
-
   const handleModeChange = useCallback(async (id: string) => {
     setMode(id)
     if (hasApi) await window.api.setMode(id)
   }, [])
 
-  // Custom config persistence — debounced is overkill; writes are tiny JSON
-  const persistCustom = useCallback(async (bed: BedType, bedGainDb: number, style: ModeStyle) => {
+  const handleTuningChange = useCallback(async (next: boolean) => {
+    setIsTuning(next)
+    if (uiSounds) {
+      try { next ? playDrawerOpen() : playDrawerClose() } catch { /* ignore */ }
+    }
+    if (hasApi) await window.api.setIsTuning(next)
+  }, [uiSounds])
+
+  // Hero gets opacity 1→0→1 around finish swap to avoid text-shadow values
+  // ghost-strobing through illegible mid-states during the 320ms cross-dissolve.
+  const [heroBlackout, setHeroBlackout] = useState(false)
+  const handleFinishChange = useCallback(async (next: Finish) => {
+    setHeroBlackout(true)
+    // Defer the actual finish swap by one frame so the blackout class lands first
+    requestAnimationFrame(() => {
+      setFinish(next)
+      window.setTimeout(() => setHeroBlackout(false), 200)
+    })
+    if (hasApi) await window.api.setFinish(next)
+  }, [])
+
+  const handleHoldRepeatChange = useCallback(async (next: HoldRepeatMode) => {
+    setHoldRepeatState(next)
+    if (hasApi) await window.api.setHoldRepeat(next)
+  }, [])
+
+  const persistCustom = useCallback(async (bed: BedType, bedGainDb: number, style: ModeStyle, arcadeEnabled: boolean) => {
     if (!hasApi) return
-    await window.api.setCustomConfig({ bed, bedGainDb, style })
+    await window.api.setCustomConfig({ bed, bedGainDb, style, arcadeEnabled })
   }, [])
 
   const handleCustomStyleChange = useCallback((style: ModeStyle) => {
     setCustomStyle(style)
-    persistCustom(customBed, customBedGainDb, style)
-  }, [customBed, customBedGainDb, persistCustom])
+    persistCustom(customBed, customBedGainDb, style, customArcadeEnabled)
+  }, [customBed, customBedGainDb, customArcadeEnabled, persistCustom])
 
   const handleCustomBedChange = useCallback((bed: BedType) => {
     setCustomBed(bed)
-    persistCustom(bed, customBedGainDb, customStyle)
-  }, [customBedGainDb, customStyle, persistCustom])
+    persistCustom(bed, customBedGainDb, customStyle, customArcadeEnabled)
+  }, [customBedGainDb, customStyle, customArcadeEnabled, persistCustom])
 
   const handleCustomBedGainChange = useCallback((db: number) => {
     setCustomBedGainDb(db)
-    persistCustom(customBed, db, customStyle)
-  }, [customBed, customStyle, persistCustom])
+    persistCustom(customBed, db, customStyle, customArcadeEnabled)
+  }, [customBed, customStyle, customArcadeEnabled, persistCustom])
+
+  const handleCustomArcadeEnabledChange = useCallback((enabled: boolean) => {
+    setCustomArcadeEnabled(enabled)
+    persistCustom(customBed, customBedGainDb, customStyle, enabled)
+  }, [customBed, customBedGainDb, customStyle, persistCustom])
 
   const resetCustom = useCallback(() => {
     const bed = DEFAULT_CUSTOM_BED
@@ -153,10 +245,9 @@ export default function App() {
     setCustomBed(bed)
     setCustomBedGainDb(gain)
     setCustomStyle(style)
-    persistCustom(bed, gain, style)
-  }, [persistCustom])
+    persistCustom(bed, gain, style, customArcadeEnabled)
+  }, [customArcadeEnabled, persistCustom])
 
-  // Per-switch DSP override handlers. Override is sparse — only includes fields the user has changed.
   const handleSwitchDspChange = useCallback((override: SwitchDspOverride) => {
     setSwitchDspOverrides((prev) => ({ ...prev, [activeProfile]: override }))
     if (hasApi) window.api.setSwitchDspOverride(activeProfile, override)
@@ -173,8 +264,12 @@ export default function App() {
 
   const activeData = profiles.find(p => p.id === activeProfile)
   const activeIndex = profiles.findIndex(p => p.id === activeProfile)
+  const typeBadge = activeData?.type?.toUpperCase()
   const isHQ = activeProfile.startsWith('cherrymx-') || activeProfile.startsWith('topre-purple') || activeProfile === 'nk-cream'
-  const themeIndex = THEMES.findIndex(t => t.id === theme)
+  // Warn surfaces the problem inline (replaces switch-desc). Only permission
+  // gets this treatment — Bluetooth latency is an info-level readout shown in
+  // the help panel, not a warning (v2.5).
+  const hasWarning = !hasPermission
 
   const cycleProfile = useCallback((dir: number) => {
     if (profiles.length === 0 || activeIndex === -1) return
@@ -182,129 +277,179 @@ export default function App() {
     handleProfileChange(profiles[next].id)
   }, [profiles, activeIndex, handleProfileChange])
 
-  const cycleTheme = useCallback((dir: number) => {
-    const next = (themeIndex + dir + THEMES.length) % THEMES.length
-    handleThemeChange(THEMES[next].id)
-  }, [themeIndex, handleThemeChange])
-
   const modeIdx = MODE_IDS.indexOf(mode)
   const cycleMode = useCallback((dir: number) => {
     const next = (modeIdx + dir + MODE_IDS.length) % MODE_IDS.length
     handleModeChange(MODE_IDS[next])
-  }, [modeIdx, handleModeChange])
+    flashMeta()
+  }, [modeIdx, handleModeChange, flashMeta])
 
-  // Keyboard: ← → profiles, Q/E themes
+  // Keyboard — ← → switch, [ ] mode, T drawer, / or ⌘? help, Esc close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTuning) return // don't hijack keys while tuning
+      // ⌘? (macOS-native help) — allow even though meta is held
+      if ((e.metaKey || e.ctrlKey) && e.key === '?') {
+        e.preventDefault()
+        setHelpOpen((o) => !o)
+        return
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      // Don't hijack keystrokes in inputs (sliders exist; if a text field is added later, still safe)
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) {
+        if (e.key !== 'Escape') return
+      }
+      // Defer ←/→ to a focused [role="tab"] (drawer tabs handle their own arrow nav).
+      // Without this, App would cycle profile while the user tries to switch tabs.
+      if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && t?.getAttribute('role') === 'tab') return
       if (e.key === 'ArrowLeft') cycleProfile(-1)
       else if (e.key === 'ArrowRight') cycleProfile(1)
-      else if (e.key === 'q' || e.key === 'Q') cycleTheme(-1)
-      else if (e.key === 'e' || e.key === 'E') cycleTheme(1)
+      else if (e.key === '[') cycleMode(-1)
+      else if (e.key === ']') cycleMode(1)
+      else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault()
+        handleTuningChange(!isTuning)
+      } else if (e.key === '/' || e.key === '?') {
+        e.preventDefault()
+        setHelpOpen((o) => !o)
+      } else if (e.key === 'Escape') {
+        if (helpOpen) setHelpOpen(false)
+        else if (isTuning) handleTuningChange(false)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cycleProfile, cycleTheme, isTuning])
+  }, [cycleProfile, cycleMode, isTuning, helpOpen, handleTuningChange])
 
-  if (isTuning) {
-    return (
-      <div className="app">
-        <TuneView
-          profileName={activeData?.name ?? activeProfile}
-          presetDsp={presetDsp}
-          effectiveDsp={effectiveDsp}
-          dspOverride={overrideForActive ?? {}}
-          onSwitchDspChange={handleSwitchDspChange}
-          onResetSwitchDsp={resetSwitchDsp}
-          modeName={activeMode.name}
-          isCustomMode={mode === 'custom'}
-          bed={customBed}
-          bedGainDb={customBedGainDb}
-          style={customStyle}
-          onBedChange={handleCustomBedChange}
-          onBedGainChange={handleCustomBedGainChange}
-          onStyleChange={handleCustomStyleChange}
-          onResetMode={resetCustom}
-          onClose={() => setIsTuning(false)}
-        />
-      </div>
-    )
-  }
+  const appCls = [
+    'app',
+    warmupPhase === 'running' && 'warming',
+    shuttingDown && 'shutting',
+  ].filter(Boolean).join(' ')
 
   return (
-    <div className="app">
-      {/* Title bar */}
-      <div className="titlebar">
-        <div className="titlebar-left">
-          <svg className="titlebar-mascot" width="16" height="16" viewBox="0 0 256 256">
-            <path fill="currentColor" d="M236.44,73.34 L213.21,57.86A60,60,0,0,0,156,16h-.29C122.79,16.16,96,43.47,96,76.89V96.63L11.63,197.88l-.1.12A16,16,0,0,0,24,224h88a104.11,104.11,0,0,0,104-104V100.28l20.44-13.62a8,8,0,0,0,0-13.32ZM126.15,133.12l-60,72a8,8,0,1,1-12.29-10.24l60-72a8,8,0,1,1,12.29,10.24ZM164,80a12,12,0,1,1,12-12,12,12,0,0,1-12,12Z"/>
-          </svg>
-          <h1>Pekko</h1>
-        </div>
-        <div className="titlebar-right">
-          {!soundEnabled && <span className="muted-badge">MUTE</span>}
-          <span>⌘⇧K</span>
+    <div className={appCls}>
+      <div className="app-body" ref={appRef}>
+      {/* Top plate — help button, status LED */}
+      <div className="top-plate">
+        <div className="help-wrap">
+          {/* Slash Notch — the geometric silhouette of the `/` key as a 10×1px
+              hairline tilted 22.5°. One visual, transparent feel, teaches its
+              own shortcut by rotating to vertical when help is open. Tune has
+              no visible hint — T keyboard only (discoverable via help panel). */}
+          <button
+            className={`slash-key${helpOpen ? ' on' : ''}`}
+            onClick={() => setHelpOpen((o) => !o)}
+            aria-label="Shortcuts"
+            aria-expanded={helpOpen}
+            title="Shortcuts · /"
+          >/</button>
+          <StatusLed
+            active={typingActive && soundEnabled}
+            muted={!soundEnabled}
+            needsPermission={!hasPermission}
+            finishName={FINISHES.find(f => f.id === finish)?.name ?? finish}
+          />
         </div>
       </div>
 
-      {/* Alerts */}
-      {!hasPermission && (
-        <PermissionBanner onRequest={() => hasApi && window.api.requestPermissions()} />
-      )}
-      {bluetoothWarning && (
-        <div className="bluetooth-warning">
-          Bluetooth detected — wired output recommended
-        </div>
+      {helpOpen && (
+        <HelpPanel
+          finish={finish}
+          onFinishChange={handleFinishChange}
+          outputInfo={outputInfo}
+          holdRepeat={holdRepeat}
+          onHoldRepeatChange={handleHoldRepeatChange}
+          onClose={() => setHelpOpen(false)}
+        />
       )}
 
-      {/* Mode — the primary axis (bed + style) */}
-      <div className="mode-group" aria-label="Soundscape mode">
-        <div className="mode-nav">
-          <button className="nav-btn" onClick={() => cycleMode(-1)} aria-label="Previous mode">{'\u2039'}</button>
-          <div className="mode-name">{activeMode.name}</div>
-          <button className="nav-btn" onClick={() => cycleMode(1)} aria-label="Next mode">{'\u203a'}</button>
-        </div>
-        <div className="mode-description" aria-live="polite">{activeMode.description}</div>
-      </div>
+      {!helpOpen && <>
+      {/* Mode kicker — silkscreen label, not a widget */}
+      <button
+        type="button"
+        className={`mode-kicker${metaVisible ? ' revealed' : ''}`}
+        onClick={() => cycleMode(1)}
+        aria-label={`Mode · ${activeMode.name} · click to cycle`}
+      >
+        <span className="mode-kicker-arrow" aria-hidden>{'\u2039'}</span>
+        <span className="mode-kicker-dot"   aria-hidden>·</span>
+        <span className="mode-kicker-name">{activeMode.name}</span>
+        <span className="mode-kicker-dot"   aria-hidden>·</span>
+        <span className="mode-kicker-arrow" aria-hidden>{'\u203a'}</span>
+      </button>
 
-      {/* Current profile */}
-      <div className={`current-profile ${activeData ? `accent-${activeData.type}` : ''}`}>
+      {/* Switch hero */}
+      <div className="switch-block">
         {loading ? (
           <div className="loading">Loading</div>
         ) : activeData ? (
           <>
-            <div className="profile-nav">
-              <button className="nav-btn" onClick={() => cycleProfile(-1)}>{'\u2039'}</button>
-              <div className="profile-current-name">{activeData.name}</div>
-              <button className="nav-btn" onClick={() => cycleProfile(1)}>{'\u203a'}</button>
+            <div className={`switch-name${heroBlackout ? ' swap-blackout' : ''}`}>{activeData.name.replace(/\s*\([^)]*\)\s*$/, '')}</div>
+            <div className="switch-nav-row">
+              <button className="switch-nav" onClick={() => cycleProfile(-1)} aria-label="Previous switch (left arrow key)" title="Previous switch (←)">{'\u2039'}</button>
+              <div className={`switch-meta ${metaVisible ? 'visible' : ''}`}>
+                {[typeBadge, isHQ ? 'HQ' : null, `${activeIndex + 1} / ${profiles.length}`]
+                  .filter(Boolean).join('   ·   ')}
+              </div>
+              <button className="switch-nav" onClick={() => cycleProfile(1)} aria-label="Next switch (right arrow key)" title="Next switch (→)">{'\u203a'}</button>
             </div>
-            <div className="profile-current-meta">
-              <span className={`type-badge type-${activeData.type}`}>
-                {activeData.type.toUpperCase()}
-              </span>
-              {isHQ && <span className="hq-badge">HQ</span>}
-              <button className="tune-chip" onClick={() => setIsTuning(true)} aria-label="Tune switch sound">
-                <span className="tune-chip-icon" aria-hidden="true">{'\u2261'}</span>
-                TUNE
-              </button>
-            </div>
-            <div className="profile-current-desc">{activeData.description}</div>
-            <div className="profile-counter">{activeIndex + 1} / {profiles.length}</div>
+            {!isTuning && !hasWarning && <div className="switch-desc">{activeData.description}</div>}
+            {!isTuning && hasWarning && (
+              <div className="warn-panel" role="alert">
+                <div className="warn-panel-title">Accessibility permission required</div>
+                <div className="warn-panel-body">
+                  Pekko needs Accessibility access to detect keystrokes. No keystroke content is read — only key codes.
+                </div>
+                <button
+                  className="warn-panel-action"
+                  onClick={() => hasApi && window.api.requestPermissions()}
+                >
+                  Grant access
+                </button>
+              </div>
+            )}
           </>
         ) : null}
       </div>
 
-      {/* Controls */}
-      <div className="controls">
-        <VolumeSlider volume={volume} onChange={handleVolumeChange} />
-        <TypingIndicator wpm={wpm} active={typingActive} />
-      </div>
+      {!isTuning && (
+        <>
+          <DspWarmthArc wpm={wpm} active={typingActive} muted={!soundEnabled} />
+          <LedLadder wpm={wpm} active={typingActive} muted={!soundEnabled} />
+          <VolumeSlider volume={volume} onChange={handleVolumeChange} />
+        </>
+      )}
 
-      {/* Footer — theme switcher */}
-      <div className="footer">
-        <button className="footer-nav-btn" onClick={() => cycleTheme(-1)} aria-label="Previous theme">{'\u2039'}</button>
-        <span className="footer-theme">{THEMES[themeIndex]?.name}</span>
-        <button className="footer-nav-btn" onClick={() => cycleTheme(1)} aria-label="Next theme">{'\u203a'}</button>
+      {isTuning && (
+        <>
+          <div className="drawer-compact-row">
+            <DspWarmthArc wpm={wpm} active={typingActive} muted={!soundEnabled} />
+            <VolumeSlider volume={volume} onChange={handleVolumeChange} />
+          </div>
+          <LedLadder wpm={wpm} active={typingActive} muted={!soundEnabled} />
+          <TuneView
+            presetDsp={presetDsp}
+            effectiveDsp={effectiveDsp}
+            dspOverride={overrideForActive ?? {}}
+            onSwitchDspChange={handleSwitchDspChange}
+            onResetSwitchDsp={resetSwitchDsp}
+            modeName={activeMode.name}
+            isCustomMode={mode === 'custom'}
+            bed={customBed}
+            bedGainDb={customBedGainDb}
+            style={customStyle}
+            onBedChange={handleCustomBedChange}
+            onBedGainChange={handleCustomBedGainChange}
+            onStyleChange={handleCustomStyleChange}
+            arcadeEnabled={customArcadeEnabled}
+            onArcadeEnabledChange={handleCustomArcadeEnabledChange}
+            onResetMode={resetCustom}
+            onClose={() => handleTuningChange(false)}
+          />
+        </>
+      )}
+      </>}
       </div>
     </div>
   )

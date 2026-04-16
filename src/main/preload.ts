@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { HoldRepeatMode } from '../shared/types'
 
 // Key event callback — wired via MessagePort for lowest latency
-let keyCallback: ((keycode: number, type: string) => void) | null = null
+let keyCallback: ((keycode: number, type: 'down' | 'up' | 'repeat') => void) | null = null
 
 // Receive the MessagePort from main process (one-time setup)
 ipcRenderer.on('key-port', (event) => {
@@ -10,7 +11,9 @@ ipcRenderer.on('key-port', (event) => {
     const d = e.data
     if (!Array.isArray(d) || d.length !== 2 || typeof d[0] !== 'number' || typeof d[1] !== 'number') return
     const [keycode, flag] = d
-    if (keyCallback) keyCallback(keycode, flag === 1 ? 'down' : 'up')
+    if (!keyCallback) return
+    const type = flag === 1 ? 'down' : flag === 2 ? 'repeat' : 'up'
+    keyCallback(keycode, type)
   }
   port.start()
 })
@@ -33,23 +36,59 @@ ipcRenderer.on('volume-changed', (_e, v: number) => {
   if (volumeChangedCallback) volumeChangedCallback(v)
 })
 
-// Theme changed from tray menu
-let themeChangedCallback: ((theme: string) => void) | null = null
-ipcRenderer.on('theme-changed', (_e, theme: string) => {
-  if (themeChangedCallback) themeChangedCallback(theme)
+// Finish changed from tray menu
+let finishChangedCallback: ((finish: string) => void) | null = null
+ipcRenderer.on('finish-changed', (_e, finish: string) => {
+  if (finishChangedCallback) finishChangedCallback(finish)
+})
+
+// ONYX v2.2 — main signals 'about to hide window' so renderer can play the
+// shutdown fade animation in the ~400ms grace before window.hide() fires.
+let beforeHideCallback: (() => void) | null = null
+ipcRenderer.on('before-hide', () => {
+  if (beforeHideCallback) beforeHideCallback()
+})
+
+let uiSoundsChangedCallback: ((enabled: boolean) => void) | null = null
+ipcRenderer.on('ui-sounds-changed', (_e, enabled: boolean) => {
+  if (uiSoundsChangedCallback) uiSoundsChangedCallback(enabled)
+})
+
+let holdRepeatChangedCallback: ((mode: HoldRepeatMode) => void) | null = null
+ipcRenderer.on('hold-repeat-changed', (_e, mode: HoldRepeatMode) => {
+  if (holdRepeatChangedCallback) holdRepeatChangedCallback(mode)
+})
+
+// Main broadcasts 'power-resume' after sleep/unlock/user-active events so the
+// renderer's AudioEngine can self-heal (resume ctx, or rebuild the audio graph
+// if ctx is closed / unresponsive).
+let powerResumeCallback: (() => void) | null = null
+ipcRenderer.on('power-resume', () => {
+  if (powerResumeCallback) powerResumeCallback()
 })
 
 contextBridge.exposeInMainWorld('api', {
-  onKeyEvent: (cb: (keycode: number, type: string) => void) => { keyCallback = cb },
+  onKeyEvent: (cb: (keycode: number, type: 'down' | 'up' | 'repeat') => void) => { keyCallback = cb },
   onSoundToggle: (cb: (enabled: boolean) => void) => { soundToggleCallback = cb },
   onProfileChanged: (cb: (id: string) => void) => { profileChangedCallback = cb },
   onVolumeChanged: (cb: (v: number) => void) => { volumeChangedCallback = cb },
-  onThemeChanged: (cb: (theme: string) => void) => { themeChangedCallback = cb },
-  setTheme:        (t: string)  => ipcRenderer.invoke('set-theme', t),
+  onFinishChanged: (cb: (finish: string) => void) => { finishChangedCallback = cb },
+  onBeforeHide:    (cb: () => void) => { beforeHideCallback = cb },
+  onUiSoundsChanged: (cb: (enabled: boolean) => void) => { uiSoundsChangedCallback = cb },
+  onHoldRepeatChanged: (cb: (mode: HoldRepeatMode) => void) => { holdRepeatChangedCallback = cb },
+  onPowerResume:   (cb: () => void) => { powerResumeCallback = cb },
+  setUiSounds:     (enabled: boolean) => ipcRenderer.invoke('set-ui-sounds', enabled),
   setMode:         (m: string)  => ipcRenderer.invoke('set-mode', m),
+  setIsTuning:     (t: boolean) => ipcRenderer.invoke('set-is-tuning', t),
+  setFinish:       (f: string)  => ipcRenderer.invoke('set-finish', f),
   setCustomConfig: (cfg: any)   => ipcRenderer.invoke('set-custom-config', cfg),
   setSwitchDspOverride: (profileId: string, override: any) =>
     ipcRenderer.invoke('set-switch-dsp-override', { profileId, override }),
+  resizeWindow:    (h: number)  => ipcRenderer.invoke('resize-window', h),
+  setHelpOpen:     (open: boolean) => ipcRenderer.invoke('set-help-open', open),
+  setHoldRepeat:   (mode: HoldRepeatMode) => ipcRenderer.invoke('set-hold-repeat', mode),
+  updateArcadeHud: (state: { kind: 'idle' } | { kind: 'active'; stage: 'engaged' | 'stacking' | 'flow' | 'zone'; perfect: boolean }) =>
+    ipcRenderer.send('update-arcade-hud', state),
   getSettings:       ()            => ipcRenderer.invoke('get-settings'),
   getProfiles:       ()            => ipcRenderer.invoke('get-profiles'),
   loadSoundPack:     (id: string)  => ipcRenderer.invoke('load-sound-pack', id),

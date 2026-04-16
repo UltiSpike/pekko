@@ -1,13 +1,34 @@
 import { BrowserWindow, MessageChannelMain } from 'electron'
-import { uIOhook } from 'uiohook-napi'
+import { uIOhook, UiohookKey } from 'uiohook-napi'
+import { pulseTrayOnce } from './tray'
+import type { HoldRepeatMode } from '../shared/types'
+
+// uIOhook keycodes for the six "information work" keys — the subset that
+// gets hold-repeat in 'edit' mode. 'global' mode ignores this set and lets
+// every key through; 'off' mode drops every auto-repeat.
+const REPEAT_KEYS: ReadonlySet<number> = new Set([
+  UiohookKey.Backspace,
+  UiohookKey.Delete,
+  UiohookKey.ArrowUp,
+  UiohookKey.ArrowDown,
+  UiohookKey.ArrowLeft,
+  UiohookKey.ArrowRight,
+])
+
+let holdRepeatMode: HoldRepeatMode = 'off'
+
+export function setHoldRepeat(mode: HoldRepeatMode): void {
+  holdRepeatMode = mode
+}
 
 let isListening = false
 let eventsRegistered = false
 const activeKeys = new Set<number>()
 let keyPort: Electron.MessagePortMain | null = null
 
-export function startKeyboardListener(mainWindow: BrowserWindow): boolean {
+export function startKeyboardListener(mainWindow: BrowserWindow, initialHoldRepeat: HoldRepeatMode): boolean {
   if (isListening) return true
+  holdRepeatMode = initialHoldRepeat
 
   // Create MessagePort (renderer needs this even before listener starts)
   if (!keyPort) {
@@ -20,9 +41,23 @@ export function startKeyboardListener(mainWindow: BrowserWindow): boolean {
   // Register uIOhook events only once — they persist across start/stop
   if (!eventsRegistered) {
     uIOhook.on('keydown', (event: any) => {
-      if (activeKeys.has(event.keycode)) return
-      activeKeys.add(event.keycode)
-      keyPort?.postMessage([event.keycode, 1])
+      const kc = event.keycode
+      if (activeKeys.has(kc)) {
+        // OS auto-repeat. Filter by current mode:
+        //   off    → drop all repeats
+        //   edit   → drop unless key is in REPEAT_KEYS
+        //   global → pass every repeat through
+        if (holdRepeatMode === 'off') return
+        if (holdRepeatMode === 'edit' && !REPEAT_KEYS.has(kc)) return
+        keyPort?.postMessage([kc, 2])
+        return
+      }
+      activeKeys.add(kc)
+      keyPort?.postMessage([kc, 1])
+      // Tray keystroke pulse — fires only on fresh keydowns (OS auto-repeat
+      // is handled above and intentionally does NOT pulse, matching audio
+      // engine's "physically realistic" default: one press = one event).
+      pulseTrayOnce()
     })
 
     uIOhook.on('keyup', (event: any) => {
@@ -53,4 +88,37 @@ export function stopKeyboardListener(): void {
     isListening = false
     activeKeys.clear()
   } catch (err) { console.error('[Pekko] Stop error:', err) }
+}
+
+// Sleep/wake pair. Unlike stopKeyboardListener, we keep the MessagePort alive
+// so the renderer's port reference stays valid across power cycles — there's
+// no way to re-deliver a port to an existing renderer. On wake, uIOhook is
+// re-started which re-registers the CGEventTap that macOS tears down on sleep.
+export function pauseForSleep(): void {
+  if (!isListening) return
+  try { uIOhook.stop() } catch {}
+  isListening = false
+  activeKeys.clear()  // drop any held keys so we don't leak ghost keyups post-wake
+  console.log('[Pekko] Keyboard paused for sleep')
+}
+
+export function resumeAfterWake(): void {
+  if (isListening) return
+  try {
+    uIOhook.start()
+    isListening = true
+    console.log('[Pekko] Keyboard re-registered after wake')
+  } catch (err) {
+    console.error('[Pekko] Keyboard restart failed, retrying in 1s:', err)
+    setTimeout(() => {
+      if (isListening) return
+      try {
+        uIOhook.start()
+        isListening = true
+        console.log('[Pekko] Keyboard re-registered (retry ok)')
+      } catch (err2) {
+        console.error('[Pekko] Keyboard restart retry failed:', err2)
+      }
+    }, 1000)
+  }
 }

@@ -1,5 +1,7 @@
 import { getKeyPan } from '@shared/key-positions'
 import { Mode, ModeStyle, getMode, DEFAULT_MODE_ID, SwitchDsp, DEFAULT_SWITCH_DSP, dbToGain } from '@shared/modes'
+import { ArcadeOverlayLayer } from './arcade/ArcadeOverlayLayer.ts'
+import { ArcadeHudController } from './arcade/ArcadeHudController.ts'
 
 interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
 interface MultiPack {
@@ -29,6 +31,9 @@ export class AudioEngine {
   private lastVariant = -1
   private pool: VoiceSlot[] = []
   private activeVoices = 0
+
+  private overlayLayer = new ArcadeOverlayLayer()
+  private hudController = new ArcadeHudController()
 
   // #3: Typing intensity model
   private lastKeyTime = 0
@@ -193,7 +198,10 @@ export class AudioEngine {
   // === Mode switching — applies style atomically (no bed) ===
   setMode(modeOrId: string | Mode) {
     const mode = typeof modeOrId === 'string' ? getMode(modeOrId) : modeOrId
+    const prevArcade = this.currentMode.arcadeEnabled
+    const prevModeId = this.currentMode.id
     this.currentMode = mode
+
     if (this.ctx && this.airLPF && this.highShelf && this.lowShelf && this.wetGain) {
       const now = this.ctx.currentTime
       const rampEnd = now + 0.3
@@ -207,7 +215,34 @@ export class AudioEngine {
       rampParam(this.lowShelf.gain, mode.style.lowShelfDb)
       rampParam(this.wetGain.gain, mode.style.wetMix)
     }
-    console.log(`[Audio] mode=${mode.id} style=airLPF ${mode.style.airLpfHz}Hz jitter=${mode.style.pitchJitter}`)
+
+    // Arcade overlay + HUD activation based on arcadeEnabled flip
+    if (mode.arcadeEnabled && !prevArcade) {
+      this.activateArcade()
+    } else if (!mode.arcadeEnabled && prevArcade) {
+      this.deactivateArcade()
+    } else if (prevArcade && mode.arcadeEnabled && prevModeId !== mode.id) {
+      // Same arcade=true, different mode — per spec §4 "Mode 切换即新会话".
+      // Reset combo / per-press layers / swell so the new mode starts clean.
+      this.overlayLayer.onReset()
+    }
+
+    console.log(`[Audio] mode=${mode.id} arcade=${mode.arcadeEnabled}`)
+  }
+
+  private async activateArcade(): Promise<void> {
+    if (!this.ctx) return
+    await this.overlayLayer.activate(this.ctx, {
+      onStageChange: (stage, combo) => this.hudController.onStageChange(stage, combo),
+      onPerfect:     () => this.hudController.onPerfect(),
+      onReset:       () => this.hudController.onReset(),
+    })
+    this.hudController.activate()
+  }
+
+  private deactivateArcade(): void {
+    this.overlayLayer.deactivate()
+    this.hudController.deactivate()
   }
 
   // === #3: Typing intensity model ===
@@ -234,6 +269,14 @@ export class AudioEngine {
   // === #5: Adaptive volume — decays during sustained typing ===
   private updateAdaptiveVolume() {
     const now = performance.now()
+
+    // Rush / Custom+arcade: fatigue decay is dropped per spec §7 (sprint mode).
+    if (this.currentMode.arcadeEnabled) {
+      this.adaptiveMultiplier = 1.0
+      this.typingStartTime = 0
+      this.lastAdaptiveUpdate = now
+      return
+    }
 
     if (now - this.lastKeyTime > 3000) {
       // Pause > 3 seconds — reset to full volume
@@ -413,10 +456,49 @@ export class AudioEngine {
   }
 
   // === Playback (all optimizations converge here) ===
-  playSound(keycode: number, type: 'down' | 'up'): void {
+  playSound(keycode: number, type: 'down' | 'up' | 'repeat'): void {
     if (!this._enabled || !this.ctx || !this.masterGain) return
     const pack = this.packs.get(this.activeProfile)
     if (!pack) return
+
+    // Repeat path: OS auto-repeat for whitelisted keys (⌫ ⌦ ← → ↑ ↓). Plays
+    // the down sound at fixed intensity 0.50 — deterministic "metronome tick"
+    // that bypasses interval-based intensity, per-key history, WPM, jitter,
+    // and per-switch top/down balance. Adaptive volume still applies so a
+    // sustained hold gets quieter alongside other typing, and spatial pan is
+    // preserved so arrow keys still land on their side.
+    if (type === 'repeat') {
+      let buffer: AudioBuffer | null | undefined
+      if (pack.type === 'sprite') {
+        buffer = pack.keys.get(keycode)?.down ?? pack.fallbackDown
+      } else {
+        const special = SPECIAL_KEYS[keycode]
+        buffer = (special && pack.data.press.special[special]) || this.pickVariant(pack.data.press.generic)
+      }
+      if (!buffer) return
+      const now = this.ctx.currentTime
+      const playTime = now + SCHEDULE_OFFSET
+      const slot = this.acquireSlot()
+      const source = this.ctx.createBufferSource()
+      source.buffer = buffer
+      source.playbackRate.value = 1.0
+      const intensityVol = 0.5 + 0.50 * 0.5 // fixed intensity 0.50 → 0.75
+      const finalVol = intensityVol * this.adaptiveMultiplier
+      slot.gain.gain.setValueAtTime(finalVol, playTime)
+      slot.panner.pan.setValueAtTime(getKeyPan(keycode), playTime)
+      source.connect(slot.gain)
+      slot.source = source
+      const dur = Math.min(buffer.duration * this.currentDsp.decayScale, MAX_DUR)
+      const fadeStart = Math.max(0, dur - 0.025)
+      slot.gain.gain.setValueAtTime(finalVol, playTime + fadeStart)
+      slot.gain.gain.linearRampToValueAtTime(0, playTime + dur)
+      source.start(playTime)
+      source.stop(playTime + dur)
+      source.onended = () => this.releaseSlot(slot)
+      // Hold-repeat must not trigger arcade overlay / combo (spec §4).
+      // This `return` prevents fall-through to the overlay hook at method end.
+      return
+    }
 
     // WPM tracking (keydown only)
     if (type === 'down') this.updateWpm()
@@ -494,6 +576,14 @@ export class AudioEngine {
     source.start(playTime, offsetJitter)
     source.stop(playTime + dur)
     source.onended = () => this.releaseSlot(slot)
+
+    // === Arcade overlay hook ===
+    // Only on keydown (not keyup). playTime identical to main source's — zero
+    // perceived latency offset vs the axis click.
+    if (type === 'down' && this.currentMode.arcadeEnabled) {
+      const nowMs = performance.now()
+      this.overlayLayer.onKeydown(nowMs, playTime)
+    }
   }
 
   private pickVariant(variants: AudioBuffer[]): AudioBuffer | undefined {
@@ -534,8 +624,45 @@ export class AudioEngine {
 
   resume() { if (this.ctx?.state === 'suspended') this.ctx.resume() }
 
+  // Called by the power-resume IPC after the system wakes / unlocks. Three-
+  // tier fallback: running → no-op; suspended → ctx.resume() with 500ms
+  // verify; closed / resume ineffective → tear down and rebuild the entire
+  // audio graph, restoring profile / mode / dsp from saved state.
+  async wake(): Promise<void> {
+    if (!this.ctx || !this.activeProfile) return  // not initialized yet — boot path will handle it
+
+    const state = this.ctx.state
+    console.log(`[Audio] wake: state=${state}`)
+
+    if (state === 'running') return
+
+    if (state === 'suspended') {
+      try { await this.ctx.resume() } catch (err) { console.warn('[Audio] wake: resume() threw', err) }
+      await new Promise(r => setTimeout(r, 500))
+      if (this.ctx?.state === 'running') {
+        console.log('[Audio] wake: soft recovery ok')
+        return
+      }
+      // fall through → hard rebuild
+    }
+
+    // state === 'closed' | resume() ineffective → hard rebuild
+    const savedProfile = this.activeProfile
+    const savedMode = this.currentMode
+    const savedDsp = this.currentDsp
+    this.destroy()
+    await this.init()
+    await this.loadProfile(savedProfile)
+    this.setMode(savedMode)
+    this.applySwitchDsp(savedDsp)
+    console.log('[Audio] wake: hard rebuild ok')
+  }
+
   // --- Cleanup (prevents memory leaks) ---
   destroy() {
+    // Tear down arcade first so overlay voices / swell don't linger when main pool releases
+    this.deactivateArcade()
+
     // Stop all active sources
     for (const slot of this.pool) {
       if (slot.source) {

@@ -1,17 +1,25 @@
 import { useEffect, useState, useCallback } from 'react'
 import { audioEngine } from '../audio/AudioEngine'
 import type { Mode, SwitchDsp, SwitchDspOverride } from '@shared/modes'
+import type { HoldRepeatMode } from '@shared/types'
 
 declare global {
   interface Window {
     api: {
-      onKeyEvent: (cb: (keycode: number, type: string) => void) => void
+      onKeyEvent: (cb: (keycode: number, type: 'down' | 'up' | 'repeat') => void) => void
       onSoundToggle: (cb: (enabled: boolean) => void) => void
       onProfileChanged: (cb: (id: string) => void) => void
       onVolumeChanged: (cb: (v: number) => void) => void
-      onThemeChanged: (cb: (theme: string) => void) => void
-      setTheme: (t: string) => Promise<boolean>
+      onFinishChanged: (cb: (finish: string) => void) => void
+      onBeforeHide: (cb: () => void) => void
+      onUiSoundsChanged: (cb: (enabled: boolean) => void) => void
+      onHoldRepeatChanged: (cb: (mode: HoldRepeatMode) => void) => void
+      onPowerResume: (cb: () => void) => void
+      setUiSounds: (enabled: boolean) => Promise<boolean>
+      setHoldRepeat: (mode: HoldRepeatMode) => Promise<boolean>
       setMode: (m: string) => Promise<boolean>
+      setIsTuning: (t: boolean) => Promise<boolean>
+      setFinish: (f: string) => Promise<boolean>
       setCustomConfig: (cfg: any) => Promise<boolean>
       setSwitchDspOverride: (profileId: string, override: SwitchDspOverride) => Promise<boolean>
       getSettings: () => Promise<any>
@@ -21,12 +29,19 @@ declare global {
       setVolume: (v: number) => Promise<boolean>
       checkPermissions: () => Promise<boolean>
       requestPermissions: () => Promise<boolean>
+      resizeWindow: (h: number) => Promise<boolean>
+      setHelpOpen: (open: boolean) => Promise<boolean>
     }
   }
 }
 
+export interface OutputInfo {
+  latencyMs: number
+  isBluetooth: boolean
+}
+
 export function useAudioEngine(activeProfileId: string, volume: number, mode: Mode, switchDsp: SwitchDsp) {
-  const [bluetoothWarning, setBluetoothWarning] = useState(false)
+  const [outputInfo, setOutputInfo] = useState<OutputInfo | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [wpm, setWpm] = useState(0)
   const [typingActive, setTypingActive] = useState(false)
@@ -41,8 +56,10 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
   useEffect(() => {
     if (!window.api) return
     window.api.onKeyEvent((keycode, type) => {
+      // TEMP DIAG — remove after debug
+      console.log('[Diag] key', keycode, type, 'ctx=', (audioEngine as any).ctx?.state, 'enabled=', (audioEngine as any)._enabled, 'profile=', (audioEngine as any).activeProfile, 'masterGain=', (audioEngine as any).masterGain?.gain.value)
       audioEngine.resume()
-      audioEngine.playSound(keycode, type as 'down' | 'up')
+      audioEngine.playSound(keycode, type)
       pollWpm()
     })
 
@@ -52,12 +69,18 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
       setSoundEnabled(enabled)
     })
 
-    // Bluetooth latency check
+    // Power wake — system resume / screen unlock / user-active. Engine picks
+    // no-op / resume / rebuild based on ctx.state.
+    window.api.onPowerResume(() => { audioEngine.wake() })
+
+    // Output latency probe — informational only. Reported as a silent readout
+    // in the help panel (no warn state). v2.5 reverted the warn-level treatment
+    // because the warning read as paternalistic for users on Bluetooth by choice.
     const checkBt = setTimeout(() => {
-      const { isBluetooth, latencyMs } = audioEngine.checkOutputLatency()
-      if (isBluetooth) {
-        console.warn(`[Audio] High latency: ${latencyMs}ms (Bluetooth?)`)
-        setBluetoothWarning(true)
+      const info = audioEngine.checkOutputLatency()
+      setOutputInfo(info)
+      if (info.isBluetooth) {
+        console.info(`[Audio] Output latency ${info.latencyMs}ms (likely Bluetooth)`)
       }
     }, 3000)
 
@@ -93,5 +116,5 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
     audioEngine.applySwitchDsp(switchDsp)
   }, [switchDsp])
 
-  return { bluetoothWarning, soundEnabled, wpm, typingActive }
+  return { outputInfo, soundEnabled, wpm, typingActive }
 }
