@@ -1,95 +1,86 @@
+# Pekko
+
 <div align="center">
 
 <img src="assets/icons/pekko.iconset/icon_256x256.png" width="128" />
 
-# Pekko
+**Your mechanical keyboard, on any keyboard.**
 
-**A typing soundscape, tuned to your mode.**
-
-Flow-state audio for macOS · Made for deep work · Open source · Fully offline
+Turn your MacBook or membrane keyboard into a thocky mechanical experience.
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Apache_2.0-blue?style=flat-square" alt="License" /></a>
-  <a href="https://github.com/UltiSpike/pekko/releases"><img src="https://img.shields.io/badge/v0.1.0-green?style=flat-square" alt="Version" /></a>
+  <a href="https://github.com/UltiSpike/pekko/releases"><img src="https://img.shields.io/badge/Download-Green?style=flat-square" alt="Download" /></a>
   <img src="https://img.shields.io/badge/macOS_11+-000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
 </p>
 
-**[中文](README_CN.md)**
-
 </div>
 
-&nbsp;
+---
 
-<!-- TODO: 30s screen recording — launch → type → switch profile → open tune drawer -->
-<!-- <p align="center"><img src="assets/preview.gif" width="640" /></p> -->
+Your $2000 MacBook has worse typing sound than a $60 mechanical keyboard. That's a problem.
+
+Pekko plays real mechanical key sounds when you type—no matter what keyboard you're using. It listens to your keystrokes and responds with spatial audio, per-switch DSP tuning, and adaptive volume that keeps you in the zone.
 
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```
 
-`←` `→` switch profile · `[` `]` cycle mode · `T` tune drawer · `⇧⌘K` mute · `⌥⌘K` toggle window
-
-<sub>macOS 11+ / Node 18+ / Accessibility permission required on first launch — reads keycodes only, never input content (<a href="PRIVACY.md">privacy statement</a>)</sub>
-
-&nbsp;
+<sub>macOS 11+ · Node 18+ · Accessibility permission required · <a href="PRIVACY.md">Reads keycodes only, never input content</a></sub>
 
 ---
 
-&nbsp;
+## Why Pekko is different
 
-## Four modes
+| | Klack | Klakk | Keeby | **Pekko** |
+|---|:---:|:---:|:---:|:---:|
+| Per-switch DSP tuning | — | — | — | ✓ |
+| Custom mode (full control) | — | — | ✓ | ✓ |
+| Noise bed (focus/cozy) | — | — | — | ✓ |
+| Arcade combo mode | — | — | — | ✓ |
+| Adaptive volume (fatigue prevention) | — | — | — | ✓ |
+| WPM tracking + visual | — | — | ✓ | ✓ |
+| Open source | — | — | — | ✓ |
 
-| Mode | Bed | Character |
-|------|-----|-----------|
-| **Thock** · default | — | Heavy low-end, warm decay, satisfying weight on every keystroke |
-| Deep Focus | brown, -38 dB | Muted keys behind a warm bed — disappear into the work |
-| Cozy Writing | pink, -40 dB | Softer keys with pink warmth — long sessions |
-| Classic Mech | — | Full mechanical fidelity, every switch as recorded |
-
-&nbsp;
-
----
-
-&nbsp;
-
-## Acoustic engine
-
-Per-mode morph: low-shelf weight, wet mix, air LPF, per-key jitter. Constant across modes: 24-voice pool, 104-key stereo pan map, sub-10 ms end-to-end latency.
-
-<details>
-<summary>Signal chain & parameters</summary>
-
-&nbsp;
-
-```
-                       ┌──── dry (82-88%) ────┐
-  master gain ─────────┤                      ├── lowShelf ── midScoop ── highShelf ── airLPF ── compressor ──▶ out
-                       └── 12 ms delay ── deskLPF ── wet (12-18%) ──┘
-
-  bed (brown | pink) ────────────────────────────────────────────────────────────────────▶ out  (bypasses compressor)
-```
-
-| Node | Default (Classic) | Mode range |
-|------|-------------------|------------|
-| Low shelf @ 180 Hz | +2.5 dB | +2.5 to +6 dB |
-| Wet mix | 12% | 12–18% |
-| Air LPF | 13 kHz, Q 0.5 | 6.5–13 kHz |
-| High shelf @ 9 kHz | +0.5 dB | -1 to +0.5 dB |
-| Pitch jitter (±) | 2.5% | 0.3–2.5% |
-| Bed | — | brown / pink / none, -38 to -40 dB |
-| Mid scoop | -3 dB @ 3.8 kHz, Q 1.5 | fixed |
-| Compressor | -18 dB, 2.5:1, 35 ms attack | fixed |
-| Schedule offset | 2 ms | fixed |
-
-</details>
-
-&nbsp;
+Other apps play different samples. Pekko shapes each switch's character through audio processing—body peak, spring notch, transient, decay—so a Cherry MX Black sounds different from a Holy Panda using the same source audio.
 
 ---
 
-&nbsp;
+## Five modes
 
-## Thirteen switches
+| Mode | Sound | Best for |
+|------|-------|----------|
+| **Thock** | Heavy low-end, warm decay | Deep work, flow state |
+| **Deep Focus** | Brown noise bed (-38 dB) | Blocking distractions |
+| **Cozy Writing** | Pink noise warmth (-40 dB) | Long sessions |
+| **Classic Mech** | No processing, full fidelity | Hearing the switch as recorded |
+| **Rush** | Arcade combo overlay + HUD | Gamified sprints |
+
+Press `T` to open the tuning drawer. Create your own mode with full control over EQ, bed, jitter, and arcade settings.
+
+---
+
+## Controls
+
+`←` `→` · Switch profile · `[` `]` · Cycle mode · `T` · Tune drawer · `⇧⌘K` · Mute · `/` · Help
+
+---
+
+## Per-switch DSP
+
+Each profile includes curated DSP parameters—not just different samples:
+
+- **Body Peak** (150-800Hz) — low-mid body
+- **Spring Notch** (-12 to +3dB @ 2.5kHz) — suppress or emphasize spring resonance
+- **Transient** (-6 to +6dB @ 5kHz) — attack sharpness
+- **Decay Scale** (0.5-2.0) — sample tail length
+- **Top/Down Balance** — release vs press relative gain
+
+Flavors let you shift character: **Stock**, **Deep** (more body), **Bright** (crisper), **Smooth** (polished).
+
+---
+
+## 13 Switch Profiles
 
 | Type | Switches |
 |------|----------|
@@ -97,68 +88,29 @@ Per-mode morph: low-shelf weight, wet mix, air LPF, per-key jitter. Constant acr
 | **Tactile** | Cherry MX Brown (HQ) · Topre Purple (HQ) · Holy Panda · Topre |
 | **Clicky** | Cherry MX Blue (HQ) · Blue · Kailh Box Navy · Buckling Spring |
 
-<sub>*(HQ)* = per-key high-quality recording (sprite or multi-file). Others use 5-variant kbsim packs.</sub>
+---
 
-A single instrument-panel aesthetic follows your system light/dark. See [docs/design/CHASSIS.md](docs/design/CHASSIS.md).
+## Architecture
 
-&nbsp;
+```
+Main (Electron)                           Renderer (React)
+┌─────────────────────────┐             ┌────────────────────────────┐
+│ uiohook-napi           │             │ AudioEngine                │
+│ (global key hook)      │ ──▶ MessagePort ──▶ 24-voice pool       │
+│                         │             │ StereoPanner per key       │
+│ IPC Handlers ◄── invoke│ ──▶ invoke ──▶ React UI                  │
+│ Tray · Store (JSON)    │             │ NES.css + vibrancy         │
+└─────────────────────────┘             └────────────────────────────┘
+```
+
+- 24-voice audio pool with sub-10ms latency
+- 104-key stereo pan map (A sounds left, Enter sounds right)
+- Fully offline — no network calls
+- `contextIsolation: true`, `nodeIntegration: false`
 
 ---
 
-&nbsp;
-
-<details>
-<summary>Architecture</summary>
-
-&nbsp;
-
-```
-  Main (Electron)                            Renderer (React)
- ┌────────────────────────┐              ┌───────────────────────────┐
- │  uiohook-napi ──────── MessagePort ──▶  AudioEngine              │
- │  (global key hook)      │              │  (24-voice pool,          │
- │                         │              │   StereoPanner per voice) │
- │  IPC Handlers ◄─────── invoke ───────▶  React UI                 │
- │  Tray · Store (JSON)    │              │  (NES.css + vibrancy)     │
- └────────────────────────┘              └───────────────────────────┘
-```
-
-```
-src/
-├── main/
-│   ├── index.ts             # Lifecycle, global shortcuts
-│   ├── keyboard.ts          # uiohook → MessagePort
-│   ├── ipc-handlers.ts      # Sound pack loading (allowlist + path-safe)
-│   ├── preload.ts           # contextBridge (7 methods)
-│   ├── store.ts             # JSON persistence
-│   └── tray.ts              # Tray menu
-├── renderer/
-│   ├── audio/AudioEngine.ts # Psychoacoustic engine
-│   ├── components/          # UI components
-│   └── hooks/               # useAudioEngine, useProfiles
-└── shared/
-    ├── types.ts
-    ├── modes.ts             # 4 Mode presets (bed + StyleLevel bundles)
-    └── key-positions.ts     # 104-key stereo pan map
-```
-
-</details>
-
-<details>
-<summary>Security</summary>
-
-&nbsp;
-
-Fully offline — no `fetch`, `http`, or outbound calls anywhere in the codebase.
-
-`contextIsolation: true` · `nodeIntegration: false` · `contextBridge` exposes 7 read-only methods · Profile IDs validated against allowlist + path-traversal regex.
-
-</details>
-
-<details>
-<summary>Development</summary>
-
-&nbsp;
+## Development
 
 | Command | |
 |---------|---|
@@ -167,14 +119,19 @@ Fully offline — no `fetch`, `http`, or outbound calls anywhere in the codebase
 | `npm run build` | Build |
 | `npm run package` | .dmg + .zip (arm64 & x64) |
 
-</details>
+---
 
-&nbsp;
+## FAQ
+
+**Why does it need Accessibility permission?**
+macOS requires this for global keyboard monitoring. Pekko only reads keycodes—never keystroke content.
+
+**Does it work with Bluetooth headphones?**
+Yes, but latency increases (40-200ms typical). Wired speakers recommended.
+
+**Is it free?**
+Yes. Open source under Apache 2.0. Sound packs carry their own licenses.
 
 ---
 
-&nbsp;
-
-[Contributing](CONTRIBUTING.md) · [Mechvibes](https://mechvibes.com) · [uiohook-napi](https://github.com/nickolay/uiohook-napi) · [NES.css](https://nostalgic-css.github.io/NES.css/)
-
-[Apache 2.0](LICENSE) — sound packs carry their own licenses ([NOTICE](NOTICE))
+[Contributing](CONTRIBUTING.md) · [Apache 2.0](LICENSE) · [Sound Pack Licenses](NOTICE)

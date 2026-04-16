@@ -161,7 +161,10 @@ app.on('ready', () => {
     console.log(`[Pekko] Power: ${label}`)
     resumeAfterWake()
     if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log('[Pekko] sending power-resume to renderer')
       mainWindow.webContents.send('power-resume')
+    } else {
+      console.log('[Pekko] warning: mainWindow destroyed, skipping power-resume')
     }
   }
   powerMonitor.on('suspend', onSleepLike('suspend'))

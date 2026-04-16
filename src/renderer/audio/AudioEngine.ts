@@ -678,12 +678,31 @@ export class AudioEngine {
   get mode() { return this.currentMode }
 
   resume() {
-    if (!this.ctx) return
+    if (!this.ctx) {
+      console.warn('[Audio] resume: no ctx, initializing')
+      this.init()
+      return
+    }
     const state = this.ctx.state
+    if (state === 'running') {
+      // Already running, verify masterGain is connected
+      if (!this.masterGain || !this.masterGain.context) {
+        console.warn('[Audio] resume: running but broken, rebuilding')
+        this.wake()
+      }
+      return
+    }
     if (state === 'suspended') {
-      this.ctx.resume().catch(err => console.warn('[Audio] resume() failed:', err))
-    } else if (state !== 'running') {
-      // Non-running, non-suspended state needs full wake recovery
+      this.ctx.resume().then(() => {
+        console.log('[Audio] resume: resumed successfully')
+      }).catch(err => {
+        console.warn('[Audio] resume() failed:', err)
+        this.wake()
+      })
+    } else if (state === 'closed') {
+      console.warn('[Audio] resume: ctx closed, rebuilding')
+      this.wake()
+    } else {
       console.warn('[Audio] resume: unexpected state', state)
       this.wake()
     }
