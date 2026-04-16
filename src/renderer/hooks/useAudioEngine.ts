@@ -56,9 +56,29 @@ export function useAudioEngine(activeProfileId: string, volume: number, mode: Mo
   useEffect(() => {
     if (!window.api) return
     window.api.onKeyEvent((keycode, type) => {
-      // TEMP DIAG — remove after debug
-      console.log('[Diag] key', keycode, type, 'ctx=', (audioEngine as any).ctx?.state, 'enabled=', (audioEngine as any)._enabled, 'profile=', (audioEngine as any).activeProfile, 'masterGain=', (audioEngine as any).masterGain?.gain.value)
-      audioEngine.resume()
+      const engine = audioEngine as any
+      const ctxState = engine.ctx?.state
+      const hasCtx = !!engine.ctx
+      const hasMaster = !!engine.masterGain
+      const hasPack = engine.activeProfile && engine.packs.has(engine.activeProfile)
+
+      if (!hasCtx || !hasMaster || !hasPack || ctxState !== 'running') {
+        console.warn('[Audio] key event diagnostics:', {
+          keycode,
+          type,
+          ctxState,
+          hasCtx,
+          hasMaster,
+          hasPack,
+          activeProfile: engine.activeProfile,
+          packCount: engine.packs?.size
+        })
+      }
+
+      if (ctxState !== 'running') {
+        audioEngine.wake()
+      }
+
       audioEngine.playSound(keycode, type)
       pollWpm()
     })

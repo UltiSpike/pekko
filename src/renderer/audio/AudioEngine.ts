@@ -166,6 +166,7 @@ export class AudioEngine {
 
     this.initPool()
     this.keepAlive()
+    console.log('[Audio] engine initialized, context state:', this.ctx?.state)
 
     // Latency telemetry — useful when users report "slower"
     const baseMs = ((this.ctx.baseLatency ?? 0) * 1000).toFixed(1)
@@ -384,6 +385,7 @@ export class AudioEngine {
     else if (type === 'kbsim' && raw.files) await this.loadKbsimPack(profileId, raw.files)
 
     this.activeProfile = profileId
+    console.log('[Audio] profile loaded:', profileId, 'pack type:', this.packs.get(profileId)?.type)
   }
 
   private async loadSpritePack(id: string, config: any, spriteData: any) {
@@ -457,9 +459,23 @@ export class AudioEngine {
 
   // === Playback (all optimizations converge here) ===
   playSound(keycode: number, type: 'down' | 'up' | 'repeat'): void {
-    if (!this._enabled || !this.ctx || !this.masterGain) return
+    if (!this._enabled) {
+      console.warn('[Audio] playSound: _enabled=false, muted')
+      return
+    }
+    if (!this.ctx) {
+      console.warn('[Audio] playSound: ctx=null')
+      return
+    }
+    if (!this.masterGain) {
+      console.warn('[Audio] playSound: masterGain=null')
+      return
+    }
     const pack = this.packs.get(this.activeProfile)
-    if (!pack) return
+    if (!pack) {
+      console.warn('[Audio] playSound: no pack for', this.activeProfile)
+      return
+    }
 
     // Repeat path: OS auto-repeat for whitelisted keys (⌫ ⌦ ← → ↑ ↓). Plays
     // the down sound at fixed intensity 0.50 — deterministic "metronome tick"
@@ -622,39 +638,73 @@ export class AudioEngine {
 
   get mode() { return this.currentMode }
 
-  resume() { if (this.ctx?.state === 'suspended') this.ctx.resume() }
+  resume() {
+    if (!this.ctx) return
+    const state = this.ctx.state
+    if (state === 'suspended') {
+      this.ctx.resume().catch(err => console.warn('[Audio] resume() failed:', err))
+    } else if (state !== 'running') {
+      // Non-running, non-suspended state needs full wake recovery
+      console.warn('[Audio] resume: unexpected state', state)
+      this.wake()
+    }
+  }
 
-  // Called by the power-resume IPC after the system wakes / unlocks. Three-
-  // tier fallback: running → no-op; suspended → ctx.resume() with 500ms
-  // verify; closed / resume ineffective → tear down and rebuild the entire
-  // audio graph, restoring profile / mode / dsp from saved state.
+  // Called by the power-resume IPC after the system wakes / unlocks. Also
+  // invoked from key event handler when unexpected AudioContext state detected.
+  // Three-tier fallback: running → no-op; suspended → ctx.resume() with verify;
+  // closed / failed / interrupted → hard rebuild.
   async wake(): Promise<void> {
     if (!this.ctx || !this.activeProfile) return  // not initialized yet — boot path will handle it
 
     const state = this.ctx.state
     console.log(`[Audio] wake: state=${state}`)
 
-    if (state === 'running') return
-
-    if (state === 'suspended') {
-      try { await this.ctx.resume() } catch (err) { console.warn('[Audio] wake: resume() threw', err) }
-      await new Promise(r => setTimeout(r, 500))
-      if (this.ctx?.state === 'running') {
-        console.log('[Audio] wake: soft recovery ok')
+    if (state === 'running') {
+      // Even if running, verify masterGain is still connected and working
+      if (!this.masterGain || !this.masterGain.context) {
+        console.warn('[Audio] wake: running but masterGain broken, rebuilding')
+      } else {
         return
       }
+    }
+
+    // Handle suspended state with retry logic
+    if (state === 'suspended') {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await this.ctx.resume()
+          await new Promise(r => setTimeout(r, 200))
+          if (this.ctx?.state === 'running') {
+            console.log('[Audio] wake: soft recovery ok')
+            return
+          }
+        } catch (err) {
+          console.warn(`[Audio] wake: resume attempt ${attempt + 1} failed:`, err)
+        }
+      }
+      console.warn('[Audio] wake: resume() failed after 3 attempts, falling through to hard rebuild')
       // fall through → hard rebuild
     }
 
-    // state === 'closed' | resume() ineffective → hard rebuild
+    // state === 'closed' | 'interrupted' | resume() ineffective → hard rebuild
     const savedProfile = this.activeProfile
+    const savedVolume = this.baseVolume
     const savedMode = this.currentMode
-    const savedDsp = this.currentDsp
+    const savedDsp = { ...this.currentDsp }
+    const savedEnabled = this._enabled
+
+    console.log('[Audio] wake: hard rebuild starting')
+
     this.destroy()
+
     await this.init()
     await this.loadProfile(savedProfile)
+    this.setVolume(savedVolume)
     this.setMode(savedMode)
     this.applySwitchDsp(savedDsp)
+    this.setEnabled(savedEnabled)
+
     console.log('[Audio] wake: hard rebuild ok')
   }
 
