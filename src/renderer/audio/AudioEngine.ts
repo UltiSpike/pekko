@@ -54,8 +54,13 @@ export class AudioEngine {
   // User-set master volume (0..1)
   private baseVolume = 1.0
 
+  // 仅用于诊断：前 3 次 playSound 详细日志，定位"按键有没有走到 Web Audio 调度"
+  private diagCount = 0
+
   async init(): Promise<void> {
     if (this.ctx) return
+    console.log('[Audio][Diag] init: start')
+    try {
     this.ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: 44100 })
 
     // === Psychoacoustic audio chain ===
@@ -155,6 +160,12 @@ export class AudioEngine {
     const baseMs = ((this.ctx.baseLatency ?? 0) * 1000).toFixed(1)
     const outMs = ((this.ctx.outputLatency ?? 0) * 1000).toFixed(1)
     console.log(`[Audio] init: mode-driven engine · baseLatency=${baseMs}ms outputLatency=${outMs}ms schedOffset=${SCHEDULE_OFFSET * 1000}ms`)
+    console.log('[Audio][Diag] init: done — ctx=' + this.ctx?.state + ' masterGain=' + (this.masterGain ? 'ok' : 'NULL'))
+    } catch (err) {
+      console.error('[Audio][Diag] init: THROW', err)
+      // 重新抛出：调用方 useEffect 的 .then 链需要感知失败
+      throw err
+    }
   }
 
   // === Per-switch DSP — applies the switch's character (body / spring / transient).
@@ -391,14 +402,18 @@ export class AudioEngine {
   // pan / schedule）。过去 180 行内联逻辑迁到 @shared/audio/KeySampler，此处只保留
   // 渲染侧独有的 voice pool 管理和 arcade overlay hook。
   playSound(keycode: number, type: 'down' | 'up' | 'repeat'): void {
-    if (!this._enabled) return
+    if (!this._enabled) {
+      if (this.diagCount < 3) console.warn('[Audio][Diag] playSound: _enabled=false')
+      this.diagCount++
+      return
+    }
     if (!this.ctx || !this.masterGain) {
-      console.warn('[Audio] playSound: ctx/masterGain not ready')
+      console.warn('[Audio][Diag] playSound: ctx=' + this.ctx?.state + ' masterGain=' + (this.masterGain ? 'ok' : 'NULL'))
       return
     }
     const pack = this.packs.get(this.activeProfile)
     if (!pack) {
-      console.warn('[Audio] playSound: no pack for', this.activeProfile)
+      console.warn('[Audio][Diag] playSound: no pack for activeProfile=' + JSON.stringify(this.activeProfile) + ' packs.size=' + this.packs.size)
       return
     }
 
@@ -415,7 +430,11 @@ export class AudioEngine {
       this.activeVoices,
       this.pickState,
     )
-    if (!picked) return
+    if (!picked) {
+      if (this.diagCount < 3) console.warn('[Audio][Diag] pickKeySound returned null kc=' + keycode + ' type=' + type + ' packType=' + pack.type)
+      this.diagCount++
+      return
+    }
 
     const now = this.ctx.currentTime
     const playTime = now + SCHEDULE_OFFSET
@@ -437,6 +456,18 @@ export class AudioEngine {
     source.start(playTime, picked.offsetJitterSec)
     source.stop(playTime + dur)
     source.onended = () => this.releaseSlot(slot)
+
+    // Log first 3 successful plays — 验证 playSound 到达 source.start
+    if (this.diagCount < 3) {
+      console.log('[Audio][Diag] playSound OK kc=' + keycode + ' type=' + type +
+        ' vol=' + picked.volume.toFixed(3) +
+        ' pitch=' + picked.pitch.toFixed(3) +
+        ' dur=' + picked.durationSec.toFixed(3) +
+        ' masterGain=' + this.masterGain.gain.value.toFixed(2) +
+        ' ctxState=' + this.ctx.state +
+        ' activeVoices=' + this.activeVoices)
+      this.diagCount++
+    }
 
     // === Arcade overlay hook ===
     // repeat 事件不触发 combo（spec §4），由 pickKeySound 语义分开；这里用 type 再过滤一次
