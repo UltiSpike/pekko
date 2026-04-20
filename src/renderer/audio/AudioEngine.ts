@@ -1,5 +1,5 @@
 import { getKeyPan } from '@shared/key-positions'
-import { Mode, getMode, DEFAULT_MODE_ID, SwitchDsp, DEFAULT_SWITCH_DSP } from '@shared/modes'
+import { Mode, ModeStyle, getMode, DEFAULT_MODE_ID, SwitchDsp, DEFAULT_SWITCH_DSP } from '@shared/modes'
 import { TypingAnalytics } from '@shared/audio/TypingAnalytics'
 import { pickKeySound, type SamplerPack, type SpritePack, type MultiPackData, type SpriteKeySound, type PickState } from '@shared/audio/KeySampler'
 import { ArcadeOverlayLayer } from './arcade/ArcadeOverlayLayer.ts'
@@ -45,6 +45,8 @@ export class AudioEngine {
 
   // Current mode & style — read on every playSound
   private currentMode: Mode = getMode(DEFAULT_MODE_ID)
+  // 便捷 getter：init() 和 setMode() 里多处读 mode style
+  private get style(): ModeStyle { return this.currentMode.style }
 
   // Current switch DSP — applied when profile loads. topDownBalance & decayScale read in playSound.
   private currentDsp: SwitchDsp = { ...DEFAULT_SWITCH_DSP }
