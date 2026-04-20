@@ -11,13 +11,13 @@
 // SpriteSlice 或 DecodedAudio），然后 AudioGraph.playBuffer(buffer.audio 或 buffer
 // 本身, {..., offsetSec: buffer.offsetSec ?? 0, durationSec: ...})
 
-import type { AudioBackend, DecodedAudio } from './bindings/types.ts'
+import type { AudioBackend, DecodedAudio } from './bindings/types'
 import type {
   SamplerPack,
   SpritePack,
   MultiPack,
   MultiPackData,
-} from '../../shared/audio/KeySampler.ts'
+} from '../../shared/audio/KeySampler'
 
 export interface SpriteSlice {
   readonly audio: DecodedAudio  // 共享的全量 buffer

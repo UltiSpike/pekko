@@ -13,19 +13,20 @@
 // setMode / applySwitchDsp 只记状态不真正作用到音色上。
 
 import { EventEmitter } from 'node:events'
-import type { AudioBackend, BackendPlayParams, DecodedAudio } from './bindings/types.ts'
-import { AudioGraph } from './AudioGraph.ts'
-import { Lifecycle, type LifecycleState, type SuspendReason } from './Lifecycle.ts'
-import { SoundPackStore, type SpriteSlice } from './SoundPackStore.ts'
-import { TypingAnalytics } from '../../shared/audio/TypingAnalytics.ts'
-import { pickKeySound, type PickState, type KeyBuffer } from '../../shared/audio/KeySampler.ts'
+import type { AudioBackend, BackendPlayParams, DecodedAudio } from './bindings/types'
+import { AudioGraph } from './AudioGraph'
+import { Lifecycle, type LifecycleState, type SuspendReason } from './Lifecycle'
+import { SoundPackStore, type SpriteSlice } from './SoundPackStore'
+import { TypingAnalytics } from '../../shared/audio/TypingAnalytics'
+import { pickKeySound, type PickState, type KeyBuffer } from '../../shared/audio/KeySampler'
+import { getKeyPan } from '../../shared/key-positions'
 import {
   getMode,
   DEFAULT_MODE_ID,
   DEFAULT_SWITCH_DSP,
   type Mode,
   type SwitchDsp,
-} from '../../shared/modes.ts'
+} from '../../shared/modes'
 
 export type AudioHealth =
   | { phase: 'cold' }
@@ -204,7 +205,7 @@ export class AudioCoreService extends EventEmitter {
     const params: BackendPlayParams = {
       volume: picked.volume,
       pitch: picked.pitch,
-      pan: picked.pan, // TODO(PR-2): KeySampler 目前 pan 返回 0；需要在 onKey 里调 getKeyPan(keycode)
+      pan: getKeyPan(keycode),
       durationSec: picked.durationSec,
       offsetSec: offsetSec + picked.offsetJitterSec,
     }

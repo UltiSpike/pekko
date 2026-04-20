@@ -6,7 +6,7 @@
 // PR-2 阶段极简——DSP filter ramp 留到后续 PR（按 spec §4.2）。此时 mode/switchDsp
 // 的状态由 AudioCoreService 记录但不真正作用到声音上。
 
-import type { AudioBackend, BackendPlayParams, DecodedAudio } from './bindings/types.ts'
+import type { AudioBackend, BackendPlayParams, DecodedAudio } from './bindings/types'
 
 export class AudioGraph {
   constructor(private backend: AudioBackend) {}

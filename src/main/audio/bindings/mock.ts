@@ -4,7 +4,7 @@
 // 也可以在 main 进程"挂起但不出声"的场景下当占位符（例如 PR-2 阶段挂 main lifecycle
 // 但尚未选定真实 binding）。
 
-import type { AudioBackend, BackendPlayParams, DecodedAudio } from './types.ts'
+import type { AudioBackend, BackendPlayParams, DecodedAudio } from './types'
 
 export interface MockPlayRecord {
   audio: DecodedAudio
