@@ -14,7 +14,9 @@ export interface KeyBufferLike {
   readonly duration: number
 }
 
-export type KeyBuffer = KeyBufferLike & Record<string, unknown>
+// KeyBuffer 只约束 .duration 字段，其余由实现自由扩展（DecodedAudio / AudioBuffer /
+// SpriteSlice 都合法）
+export type KeyBuffer = KeyBufferLike
 
 export interface SpriteKeySound {
   down?: KeyBuffer
