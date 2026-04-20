@@ -1,16 +1,9 @@
 import { getKeyPan } from '@shared/key-positions'
-import { Mode, ModeStyle, getMode, DEFAULT_MODE_ID, SwitchDsp, DEFAULT_SWITCH_DSP, dbToGain } from '@shared/modes'
+import { Mode, getMode, DEFAULT_MODE_ID, SwitchDsp, DEFAULT_SWITCH_DSP } from '@shared/modes'
+import { TypingAnalytics } from '@shared/audio/TypingAnalytics'
+import { pickKeySound, type SamplerPack, type SpritePack, type MultiPackData, type SpriteKeySound, type PickState } from '@shared/audio/KeySampler'
 import { ArcadeOverlayLayer } from './arcade/ArcadeOverlayLayer.ts'
 import { ArcadeHudController } from './arcade/ArcadeHudController.ts'
-
-interface SpriteKeySound { down?: AudioBuffer; up?: AudioBuffer }
-interface MultiPack {
-  press: { generic: AudioBuffer[]; special: Record<string, AudioBuffer> }
-  release: { generic: AudioBuffer | null; special: Record<string, AudioBuffer> }
-}
-type LoadedPack =
-  | { type: 'sprite'; keys: Map<number, SpriteKeySound>; fallbackDown: AudioBuffer | null; fallbackUp: AudioBuffer | null }
-  | { type: 'multi'; data: MultiPack }
 
 interface VoiceSlot {
   gain: GainNode; panner: StereoPannerNode; source: AudioBufferSourceNode | null; busy: boolean
@@ -18,27 +11,26 @@ interface VoiceSlot {
 
 const POOL_SIZE = 24
 const FADE_MS = 0.008
-const MAX_DUR = 0.40
 const SCHEDULE_OFFSET = 0.002 // #2: 2ms fixed scheduling offset — jitter-safe at modern latencyHint='interactive'
-const SPECIAL_KEYS: Record<number, string> = { 14: 'BACKSPACE', 28: 'ENTER', 41: 'ENTER', 57: 'SPACE' }
 
 export class AudioEngine {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
   private compressor: DynamicsCompressorNode | null = null
-  private packs: Map<string, LoadedPack> = new Map()
+  private packs: Map<string, SamplerPack> = new Map()
   private activeProfile = ''
-  private lastVariant = -1
   private pool: VoiceSlot[] = []
   private activeVoices = 0
 
   private overlayLayer = new ArcadeOverlayLayer()
   private hudController = new ArcadeHudController()
 
-  // #3: Typing intensity model
-  private lastKeyTime = 0
-  private typingIntensity = 0.7  // 0.3 (gentle) → 1.0 (forceful)
-  private keyIntensityMap = new Map<number, number>() // keycode → keydown intensity for keyup correlation
+  // Typing analytics (intensity / adaptive fatigue / WPM) — 从 AudioEngine 抽出，
+  // 在 @shared/audio/TypingAnalytics 可单测
+  private analytics = new TypingAnalytics()
+
+  // KeySampler 跨调用状态：variant 轮选防重复 + down→up 强度关联
+  private pickState: PickState = {}
 
   // Filter / mix refs — style morph changes these per-mode
   private airLPF: BiquadFilterNode | null = null
@@ -53,23 +45,12 @@ export class AudioEngine {
 
   // Current mode & style — read on every playSound
   private currentMode: Mode = getMode(DEFAULT_MODE_ID)
-  private get style(): ModeStyle { return this.currentMode.style }
 
   // Current switch DSP — applied when profile loads. topDownBalance & decayScale read in playSound.
   private currentDsp: SwitchDsp = { ...DEFAULT_SWITCH_DSP }
 
-  // #5: Adaptive volume decay
-  private baseVolume = 1.0         // user-set volume
-  private adaptiveMultiplier = 1.0 // decays during sustained typing
-  private typingStartTime = 0
-  private lastAdaptiveUpdate = 0
-  private adaptiveTimer: ReturnType<typeof setTimeout> | null = null
-
-  // WPM tracking (keydown timestamps from last 5 seconds)
-  private keyTimestamps: number[] = []
-  private _wpm = 0
-  private _typingActive = false
-  private typingTimeout: ReturnType<typeof setTimeout> | null = null
+  // User-set master volume (0..1)
+  private baseVolume = 1.0
 
   async init(): Promise<void> {
     if (this.ctx) return
@@ -217,6 +198,9 @@ export class AudioEngine {
       rampParam(this.wetGain.gain, mode.style.wetMix)
     }
 
+    // Keep analytics in sync with arcade flag — arcade 模式禁用疲劳衰减
+    this.analytics.setArcadeEnabled(mode.arcadeEnabled)
+
     // Arcade overlay + HUD activation based on arcadeEnabled flip
     if (mode.arcadeEnabled && !prevArcade) {
       this.activateArcade()
@@ -244,63 +228,6 @@ export class AudioEngine {
   private deactivateArcade(): void {
     this.overlayLayer.deactivate()
     this.hudController.deactivate()
-  }
-
-  // === #3: Typing intensity model ===
-  private updateIntensity() {
-    const now = performance.now()
-    const interval = now - this.lastKeyTime
-    this.lastKeyTime = now
-
-    if (interval > 2000) {
-      // Fresh start — neutral-warm, not a hammer blow
-      this.typingIntensity = 0.80
-    } else if (interval < 80) {
-      // Very fast typing — light touch
-      this.typingIntensity = Math.max(0.35, this.typingIntensity - 0.08)
-    } else if (interval < 150) {
-      // Normal fast typing
-      this.typingIntensity = 0.5 + (interval - 80) / 140 * 0.3 // 0.5-0.8
-    } else {
-      // Slow/deliberate — heavier
-      this.typingIntensity = Math.min(1.0, 0.7 + (interval - 150) / 500 * 0.3)
-    }
-  }
-
-  // === #5: Adaptive volume — decays during sustained typing ===
-  private updateAdaptiveVolume() {
-    const now = performance.now()
-
-    // Rush / Custom+arcade: fatigue decay is dropped per spec §7 (sprint mode).
-    if (this.currentMode.arcadeEnabled) {
-      this.adaptiveMultiplier = 1.0
-      this.typingStartTime = 0
-      this.lastAdaptiveUpdate = now
-      return
-    }
-
-    if (now - this.lastKeyTime > 3000) {
-      // Pause > 3 seconds — reset to full volume
-      this.adaptiveMultiplier = 1.0
-      this.typingStartTime = now
-    } else if (this.typingStartTime === 0) {
-      this.typingStartTime = now
-    } else {
-      const typingDuration = (now - this.typingStartTime) / 1000 // seconds
-
-      if (typingDuration < 5) {
-        // First 5 seconds: full volume (novelty phase)
-        this.adaptiveMultiplier = 1.0
-      } else if (typingDuration < 30) {
-        // 5-30 seconds: gentle decay to 0.75
-        this.adaptiveMultiplier = 1.0 - (typingDuration - 5) / 25 * 0.25
-      } else {
-        // 30+ seconds: stable at 0.65 (flow state)
-        this.adaptiveMultiplier = Math.max(0.65, this.adaptiveMultiplier)
-      }
-    }
-
-    this.lastAdaptiveUpdate = now
   }
 
   // === Voice pool ===
@@ -404,7 +331,7 @@ export class AudioEngine {
       if (key.endsWith('-up')) fallbackUp = s; else fallbackDown = s
     }
 
-    const pack: LoadedPack = { type: 'sprite', keys, fallbackDown, fallbackUp }
+    const pack: SpritePack = { type: 'sprite', keys, fallbackDown, fallbackUp }
     this.packs.set(id, pack)
 
     // Batch slice
@@ -443,7 +370,7 @@ export class AudioEngine {
   }
 
   private async loadKbsimPack(id: string, files: Record<string, any>) {
-    const pack: MultiPack = { press: { generic: [], special: {} }, release: { generic: null, special: {} } }
+    const pack: MultiPackData = { press: { generic: [], special: {} }, release: { generic: null, special: {} } }
     await Promise.all(Object.entries(files).map(async ([name, data]) => {
       const buf = await this.decodeData(data as any)
       if (!buf) return
@@ -457,18 +384,14 @@ export class AudioEngine {
     console.log(`[Audio] ${id}: kbsim ${pack.press.generic.length} variants`)
   }
 
-  // === Playback (all optimizations converge here) ===
+  // === Playback ===
+  // 键事件 → pickKeySound（纯计算）→ 本方法做 Web Audio 侧副作用（pool / source /
+  // pan / schedule）。过去 180 行内联逻辑迁到 @shared/audio/KeySampler，此处只保留
+  // 渲染侧独有的 voice pool 管理和 arcade overlay hook。
   playSound(keycode: number, type: 'down' | 'up' | 'repeat'): void {
-    if (!this._enabled) {
-      console.warn('[Audio] playSound: _enabled=false, muted')
-      return
-    }
-    if (!this.ctx) {
-      console.warn('[Audio] playSound: ctx=null')
-      return
-    }
-    if (!this.masterGain) {
-      console.warn('[Audio] playSound: masterGain=null')
+    if (!this._enabled) return
+    if (!this.ctx || !this.masterGain) {
+      console.warn('[Audio] playSound: ctx/masterGain not ready')
       return
     }
     const pack = this.packs.get(this.activeProfile)
@@ -477,174 +400,47 @@ export class AudioEngine {
       return
     }
 
-    // Repeat path: OS auto-repeat for whitelisted keys (⌫ ⌦ ← → ↑ ↓). Plays
-    // the down sound at fixed intensity 0.50 — deterministic "metronome tick"
-    // that bypasses interval-based intensity, per-key history, WPM, jitter,
-    // and per-switch top/down balance. Adaptive volume still applies so a
-    // sustained hold gets quieter alongside other typing, and spatial pan is
-    // preserved so arrow keys still land on their side.
-    if (type === 'repeat') {
-      let buffer: AudioBuffer | null | undefined
-      if (pack.type === 'sprite') {
-        buffer = pack.keys.get(keycode)?.down ?? pack.fallbackDown
-      } else {
-        const special = SPECIAL_KEYS[keycode]
-        buffer = (special && pack.data.press.special[special]) || this.pickVariant(pack.data.press.generic)
-      }
-      if (!buffer) return
-      const now = this.ctx.currentTime
-      const playTime = now + SCHEDULE_OFFSET
-      const slot = this.acquireSlot()
-      const source = this.ctx.createBufferSource()
-      source.buffer = buffer
-      source.playbackRate.value = 1.0
-      const intensityVol = 0.5 + 0.50 * 0.5 // fixed intensity 0.50 → 0.75
-      const finalVol = intensityVol * this.adaptiveMultiplier
-      slot.gain.gain.setValueAtTime(finalVol, playTime)
-      slot.panner.pan.setValueAtTime(getKeyPan(keycode), playTime)
-      source.connect(slot.gain)
-      slot.source = source
-      const dur = Math.min(buffer.duration * this.currentDsp.decayScale, MAX_DUR)
-      const fadeStart = Math.max(0, dur - 0.025)
-      slot.gain.gain.setValueAtTime(finalVol, playTime + fadeStart)
-      slot.gain.gain.linearRampToValueAtTime(0, playTime + dur)
-      source.start(playTime)
-      source.stop(playTime + dur)
-      source.onended = () => this.releaseSlot(slot)
-      // Hold-repeat must not trigger arcade overlay / combo (spec §4).
-      // This `return` prevents fall-through to the overlay hook at method end.
-      return
-    }
+    this.analytics.recordKey(performance.now(), keycode, type)
+    const snapshot = this.analytics.snapshot()
 
-    // Repeat path: OS auto-repeat for whitelisted keys (⌫ ⌦ ← → ↑ ↓). Plays
-    // the down sound at fixed intensity 0.50 — deterministic "metronome tick"
-    // that bypasses interval-based intensity, per-key history, WPM, jitter,
-    // and per-switch top/down balance. Adaptive volume still applies so a
-    // sustained hold gets quieter alongside other typing, and spatial pan is
-    // preserved so arrow keys still land on their side.
-    if (type === 'repeat') {
-      let buffer: AudioBuffer | null | undefined
-      if (pack.type === 'sprite') {
-        buffer = pack.keys.get(keycode)?.down ?? pack.fallbackDown
-      } else {
-        const special = SPECIAL_KEYS[keycode]
-        buffer = (special && pack.data.press.special[special]) || this.pickVariant(pack.data.press.generic)
-      }
-      if (!buffer) return
-      const now = this.ctx.currentTime
-      const playTime = now + SCHEDULE_OFFSET
-      const slot = this.acquireSlot()
-      const source = this.ctx.createBufferSource()
-      source.buffer = buffer
-      source.playbackRate.value = 1.0
-      const intensityVol = 0.5 + 0.50 * 0.5 // fixed intensity 0.50 → 0.75
-      const finalVol = intensityVol * this.adaptiveMultiplier
-      slot.gain.gain.setValueAtTime(finalVol, playTime)
-      slot.panner.pan.setValueAtTime(getKeyPan(keycode), playTime)
-      source.connect(slot.gain)
-      slot.source = source
-      const dur = Math.min(buffer.duration * this.currentDsp.decayScale, MAX_DUR)
-      const fadeStart = Math.max(0, dur - 0.025)
-      slot.gain.gain.setValueAtTime(finalVol, playTime + fadeStart)
-      slot.gain.gain.linearRampToValueAtTime(0, playTime + dur)
-      source.start(playTime)
-      source.stop(playTime + dur)
-      source.onended = () => this.releaseSlot(slot)
-      // Hold-repeat must not trigger arcade overlay / combo (spec §4).
-      // This `return` prevents fall-through to the overlay hook at method end.
-      return
-    }
-
-    // WPM tracking (keydown only)
-    if (type === 'down') this.updateWpm()
-
-    // #3: Update typing intensity from inter-key interval
-    this.updateIntensity()
-    // #5: Update adaptive volume
-    this.updateAdaptiveVolume()
-
-    let buffer: AudioBuffer | null | undefined
-
-    if (pack.type === 'sprite') {
-      const keySound = pack.keys.get(keycode)
-      if (type === 'down') buffer = keySound?.down ?? pack.fallbackDown
-      else buffer = keySound?.up ?? pack.fallbackUp
-    } else {
-      const special = SPECIAL_KEYS[keycode]
-      if (type === 'down') buffer = (special && pack.data.press.special[special]) || this.pickVariant(pack.data.press.generic)
-      else buffer = (special && pack.data.release.special[special]) || pack.data.release.generic
-    }
-    if (!buffer) return
+    const picked = pickKeySound(
+      pack,
+      keycode,
+      type,
+      snapshot,
+      this.currentMode.style,
+      this.currentDsp,
+      this.activeVoices,
+      this.pickState,
+    )
+    if (!picked) return
 
     const now = this.ctx.currentTime
-
-    // #2: Fixed scheduling offset — eliminates jitter
     const playTime = now + SCHEDULE_OFFSET
 
     const slot = this.acquireSlot()
     const source = this.ctx.createBufferSource()
-    source.buffer = buffer
+    source.buffer = picked.buffer as unknown as AudioBuffer
+    source.playbackRate.value = picked.pitch
 
-    // Mode-aware intensity. When locked (Focus / Cozy), keystrokes don't track inter-key timing.
-    const effectiveIntensity = this.style.intensityLocked ? 0.7 : this.typingIntensity
-    let volIntensity = effectiveIntensity
-    if (type === 'down') {
-      this.keyIntensityMap.set(keycode, effectiveIntensity)
-    } else {
-      // Heavy keydown → controlled release (quieter), light → loose bounce (louder)
-      const downIntensity = this.keyIntensityMap.get(keycode) ?? 0.7
-      this.keyIntensityMap.delete(keycode)
-      volIntensity = 1.15 - downIntensity * 0.3
-    }
-
-    // Pitch: only vary with intensity when NOT locked; always apply per-key character + mode-scoped jitter
-    const pitchBase = this.style.intensityLocked
-      ? 1.0
-      : 1.0 + (1.0 - this.typingIntensity) * 0.03 - this.typingIntensity * 0.02
-    const keyChar = ((keycode * 2654435761 >>> 0) % 200 - 100) / 10000
-    const pitchJitter = (Math.random() - 0.5) * this.style.pitchJitter * 2 // symmetric ±
-    source.playbackRate.value = pitchBase + keyChar + pitchJitter
-
-    // Volume: intensity × adaptive × ducking × mode-scoped jitter × per-switch top/down balance
-    const duckFactor = this.activeVoices > 8 ? 0.8 / Math.sqrt(this.activeVoices - 7) : 1.0
-    const intensityVol = 0.5 + volIntensity * 0.5
-    const volSpan = this.style.volumeJitter * 2
-    const microRandom = (1 - this.style.volumeJitter) + Math.random() * volSpan
-    // topDownBalanceDb shapes release relative to press: heavy click bars (Box Navy, Buckling) lift release;
-    // soft Topre / Inks pull release down. Press path is unaffected.
-    const balanceFactor = type === 'up' ? dbToGain(this.currentDsp.topDownBalanceDb) : 1
-    const finalVol = intensityVol * this.adaptiveMultiplier * duckFactor * microRandom * balanceFactor
-
-    slot.gain.gain.setValueAtTime(finalVol, playTime)
+    slot.gain.gain.setValueAtTime(picked.volume, playTime)
     slot.panner.pan.setValueAtTime(getKeyPan(keycode), playTime)
-
     source.connect(slot.gain)
     slot.source = source
 
-    // Sample offset jitter: 0-2ms varies transient micro-shape
-    const offsetJitter = Math.random() * 0.002
-    // decayScale stretches/shortens the perceived tail. Capped by MAX_DUR for the voice budget.
-    const dur = Math.min((buffer.duration - offsetJitter) * this.currentDsp.decayScale, MAX_DUR)
+    const dur = picked.durationSec
     const fadeStart = Math.max(0, dur - 0.025)
-    slot.gain.gain.setValueAtTime(finalVol, playTime + fadeStart)
+    slot.gain.gain.setValueAtTime(picked.volume, playTime + fadeStart)
     slot.gain.gain.linearRampToValueAtTime(0, playTime + dur)
-    source.start(playTime, offsetJitter)
+    source.start(playTime, picked.offsetJitterSec)
     source.stop(playTime + dur)
     source.onended = () => this.releaseSlot(slot)
 
     // === Arcade overlay hook ===
-    // Only on keydown (not keyup). playTime identical to main source's — zero
-    // perceived latency offset vs the axis click.
+    // repeat 事件不触发 combo（spec §4），由 pickKeySound 语义分开；这里用 type 再过滤一次
     if (type === 'down' && this.currentMode.arcadeEnabled) {
-      const nowMs = performance.now()
-      this.overlayLayer.onKeydown(nowMs, playTime)
+      this.overlayLayer.onKeydown(performance.now(), playTime)
     }
-  }
-
-  private pickVariant(variants: AudioBuffer[]): AudioBuffer | undefined {
-    if (!variants.length) return undefined
-    let i: number; do { i = Math.floor(Math.random() * variants.length) } while (i === this.lastVariant && variants.length > 1)
-    this.lastVariant = i; return variants[i]
   }
 
   setVolume(v: number) {
@@ -652,23 +448,8 @@ export class AudioEngine {
     if (this.masterGain) this.masterGain.gain.value = this.baseVolume
   }
 
-  // --- WPM tracking ---
-  private updateWpm() {
-    const now = performance.now()
-    this.keyTimestamps.push(now)
-    // Keep only last 5 seconds
-    const cutoff = now - 5000
-    this.keyTimestamps = this.keyTimestamps.filter(t => t > cutoff)
-    // WPM = (keys in 5s / 5) × 60 / 5 (avg word = 5 chars)
-    this._wpm = Math.round((this.keyTimestamps.length / 5) * 12)
-    this._typingActive = true
-    // Reset typing active after 2s idle
-    if (this.typingTimeout) clearTimeout(this.typingTimeout)
-    this.typingTimeout = setTimeout(() => { this._typingActive = false; this._wpm = 0 }, 2000)
-  }
-
-  get wpm() { return this._wpm }
-  get typingActive() { return this._typingActive }
+  get wpm(): number { return this.analytics.snapshot().wpm }
+  get typingActive(): boolean { return this.analytics.snapshot().typingActive }
 
   // --- Sound toggle (Cmd+Shift+K) ---
   private _enabled = true
@@ -781,9 +562,6 @@ export class AudioEngine {
     }
     this.activeVoices = 0
 
-    if (this.adaptiveTimer) clearTimeout(this.adaptiveTimer)
-    if (this.typingTimeout) clearTimeout(this.typingTimeout)
-
     // Close AudioContext
     if (this.ctx) {
       this.ctx.close()
@@ -801,7 +579,7 @@ export class AudioEngine {
     this.transient = null
     this.pool = []
     this.packs.clear()
-    this.keyIntensityMap.clear()
+    this.pickState = {}
     console.log('[Audio] destroyed')
   }
 
