@@ -1,10 +1,10 @@
 # 隐私声明
 
-Keeby 重视你的隐私。以下是本应用对数据处理的完整说明。
+Pekko 重视你的隐私。以下是本应用对数据处理的完整说明。
 
 ## Accessibility 权限的用途
 
-Keeby 使用 macOS Accessibility 权限**仅用于检测按键事件**（keycode + 按下/抬起状态）。
+Pekko 使用 macOS Accessibility 权限**仅用于检测按键事件**（keycode + 按下/抬起状态）。
 
 **不会读取、存储或传输**：
 - 按键内容或输入的文字
@@ -24,7 +24,7 @@ Keeby 使用 macOS Accessibility 权限**仅用于检测按键事件**（keycode
 
 ## 开源可验证
 
-Keeby 是开源软件。你可以直接审阅源代码来验证以上所有声明：
+Pekko 是开源软件。你可以直接审阅源代码来验证以上所有声明：
 
 - 键盘监听逻辑：`src/main/keyboard.ts`
 - IPC 通信：`src/main/ipc-handlers.ts`

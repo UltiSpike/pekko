@@ -4,9 +4,9 @@
 
 <img src="assets/icons/pekko.iconset/icon_256x256.png" width="128" />
 
-**Your mechanical keyboard, on any keyboard.**
+**Keyboard sounds for the keyboard you already have.**
 
-Turn your MacBook or membrane keyboard into a thocky mechanical experience.
+A macOS menu-bar app. Type anywhere, and Pekko plays the switch you picked.
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Apache_2.0-blue?style=flat-square" alt="License" /></a>
@@ -18,31 +18,23 @@ Turn your MacBook or membrane keyboard into a thocky mechanical experience.
 
 ---
 
-Your $2000 MacBook has worse typing sound than a $60 mechanical keyboard. That's a problem.
+Pekko lives in the menu bar. Each keypress plays a real switch recording, placed left-to-right across the row, then voiced so a Cherry MX Black and a Holy Panda are not the same sample with a different name. Long sessions ease the volume down on their own. Five modes cover a heavy thock, a noise bed for focus or writing, the recording left alone, and an arcade sprint.
 
-Pekko plays real mechanical key sounds when you type—no matter what keyboard you're using. It listens to your keystrokes and responds with spatial audio, per-switch DSP tuning, and adaptive volume that keeps you in the zone.
+**[Download for macOS](https://github.com/UltiSpike/pekko/releases)** · macOS 11 or later
+
+It needs Accessibility permission so it can hear keys while another app is in front. Pekko reads keycodes only — which key went down or up — never the characters you type, and it makes no network requests. [Privacy](PRIVACY.md)
+
+To run it from source (Node 18+):
 
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
 ```
 
-<sub>macOS 11+ · Node 18+ · Accessibility permission required · <a href="PRIVACY.md">Reads keycodes only, never input content</a></sub>
-
 ---
 
-## Why Pekko is different
+## What you hear
 
-| | Klack | Klakk | Keeby | **Pekko** |
-|---|:---:|:---:|:---:|:---:|
-| Per-switch DSP tuning | — | — | — | ✓ |
-| Custom mode (full control) | — | — | ✓ | ✓ |
-| Noise bed (focus/cozy) | — | — | — | ✓ |
-| Arcade combo mode | — | — | — | ✓ |
-| Adaptive volume (fatigue prevention) | — | — | — | ✓ |
-| WPM tracking + visual | — | — | ✓ | ✓ |
-| Open source | — | — | — | ✓ |
-
-Other apps play different samples. Pekko shapes each switch's character through audio processing—body peak, spring notch, transient, decay—so a Cherry MX Black sounds different from a Holy Panda using the same source audio.
+Each of the 13 profiles is a recording plus its own voicing: body, spring, attack, decay, and how loud the key-up is next to the key-down. Stock, Deep, Bright, and Smooth shift that voicing without swapping the sample. A custom mode exposes the same controls.
 
 ---
 

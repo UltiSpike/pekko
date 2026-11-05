@@ -4,22 +4,27 @@
 
 # Pekko
 
-**一席声景，契合你当下的状态。**
+**给手头这块键盘，补上机械轴的声音。**
 
-macOS 打字声景引擎 · 为深度工作设计 · 开源 · 完全离线
+macOS 菜单栏应用。在任何地方打字，Pekko 就播放你选的那颗轴。
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Apache_2.0-blue?style=flat-square" alt="License" /></a>
-  <a href="https://github.com/UltiSpike/pekko/releases"><img src="https://img.shields.io/badge/v0.1.0-green?style=flat-square" alt="Version" /></a>
+  <a href="https://github.com/UltiSpike/pekko/releases"><img src="https://img.shields.io/badge/Download-Green?style=flat-square" alt="Download" /></a>
   <img src="https://img.shields.io/badge/macOS_11+-000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
 </p>
 
 </div>
 
-&nbsp;
+---
 
-<!-- TODO: 录屏 — 30s，展示启动→打字→切轴→切主题的完整流程 -->
-<!-- <p align="center"><img src="assets/preview.gif" width="640" /></p> -->
+Pekko 待在菜单栏里。每次按键播放一段真实轴体录音，按键位从左到右摆开，再套上这颗轴自己的音色，所以 Cherry MX Black 和 Holy Panda 不是同一段采样换个名字。长时间打字时音量会自己降下来。五种 Mode：厚实的 Thock、适合专注或写作的噪声铺底、不做处理的原声，以及街机冲刺。
+
+**[下载 macOS 版](https://github.com/UltiSpike/pekko/releases)** · macOS 11 及以上
+
+它需要辅助功能权限，才能在别的应用处于前台时听到按键。Pekko 只读键码（按下或抬起），不读你输入的字符，也不访问网络。[隐私声明](PRIVACY.md)
+
+从源码运行（Node 18+）：
 
 ```bash
 git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run dev
@@ -27,15 +32,13 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 
 `←` `→` 切换轴体 · `[` `]` 切换 Mode · `T` 调音抽屉 · `⇧⌘K` 静音 · `⌥⌘K` 唤起 / 隐藏窗口
 
-<sub>macOS 11+ / Node 18+ / 首次启动需授予辅助功能权限 — 仅读取键码，不读取输入内容（<a href="PRIVACY.md">隐私声明</a>）</sub>
-
 &nbsp;
 
 ---
 
 &nbsp;
 
-## 四种 Mode
+## 五种 Mode
 
 | Mode | 底层声 | 性格 |
 |------|--------|------|
@@ -43,6 +46,7 @@ git clone https://github.com/UltiSpike/pekko.git && cd pekko && npm i && npm run
 | Deep Focus | 棕噪声, -38 dB | 按键压暗，声音隐入工作背后 |
 | Cozy Writing | 粉噪声, -40 dB | 温暖粉噪 + 柔和按键，陪伴长时间写作 |
 | Classic Mech | 无 | 全频真实机械键盘还原 |
+| Rush | 无 | 街机连击叠在按键声上，带 HUD |
 
 &nbsp;
 
@@ -135,7 +139,7 @@ src/
 │   └── hooks/               # useAudioEngine, useProfiles
 └── shared/
     ├── types.ts
-    ├── modes.ts             # 4 个 Mode preset（bed + StyleLevel 组合）
+    ├── modes.ts             # 5 个 Mode preset（bed + StyleLevel 组合）
     └── key-positions.ts     # 104 键声像映射
 ```
 
