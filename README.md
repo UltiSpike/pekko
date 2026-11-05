@@ -20,7 +20,7 @@ The sound of typing, as a switch or as a mood. It lives in the macOS menu bar.
 
 Each keypress is a real switch recording, placed along the row. A Black and a Holy Panda keep their own body, spring, and tail. Stay with it and the volume eases back: the sound remains, just no longer pressing forward. Five moods: a heavy thock, a noise bed for focus or writing, the recording as it was, and an arcade sprint.
 
-**[Download for macOS](https://github.com/UltiSpike/pekko/releases)** · macOS 11 or later
+**[Download for macOS](https://github.com/UltiSpike/pekko/releases)** · Apple silicon · macOS 11 or later
 
 It needs Accessibility permission so it can hear keys while another app is in front. Pekko reads keycodes only — which key went down or up — never the characters you type, and it makes no network requests. [Privacy](PRIVACY.md)
 
@@ -109,7 +109,7 @@ Main (Electron)                           Renderer (React)
 | `npm run dev` | Vite + Electron dev mode |
 | `npm run dev:debug` | + DevTools |
 | `npm run build` | Build |
-| `npm run package` | .dmg + .zip (arm64 & x64) |
+| `npm run package` | .dmg + .zip (Apple silicon) |
 
 ---
 
@@ -117,6 +117,9 @@ Main (Electron)                           Renderer (React)
 
 **Why does it need Accessibility permission?**
 macOS requires this for global keyboard monitoring. Pekko only reads keycodes—never keystroke content.
+
+**The first open is blocked?**
+The disk image is unsigned. In Finder, right-click Pekko and choose Open.
 
 **Does it work with Bluetooth headphones?**
 Yes, but latency increases (40-200ms typical). Wired speakers recommended.

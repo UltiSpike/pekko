@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.1.0' }}
+          name: Pekko ${{ github.ref_type == 'tag' && github.ref_name || '0.1.0' }}
+          files: |
+            dist-app/*.dmg
+            dist-app/*.zip
+          fail_on_unmatched_files: true
+          body: |
+            Apple silicon (arm64) disk image and zip.
+
+            The build is unsigned. The first time, right-click Pekko in Finder and choose Open, then allow Accessibility. Pekko reads keycodes only.
+
+            Intel Macs are not in this release.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

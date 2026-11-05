@@ -20,7 +20,9 @@
 
 按键落下，是一段真实的轴体录音，从左到右贴着键位。Black 与 Holy Panda 各有自己的身体、弹簧与尾音。坐得久了，音量自己退半步，声音还在，只是不再往前挤。五种心境：厚实的 Thock、沉进噪声的专注与写作、轴体本来的样子，以及一阵街机冲刺。
 
-**[下载 macOS 版](https://github.com/UltiSpike/pekko/releases)** · macOS 11 及以上
+**[下载 macOS 版](https://github.com/UltiSpike/pekko/releases)** · Apple 芯片 · macOS 11 及以上
+
+磁盘映像还没有签名。第一次请在访达里右键 Pekko，选择「打开」。
 
 它需要辅助功能权限，才能在别的应用处于前台时听到按键。Pekko 只读键码（按下或抬起），不读你输入的字符，也不访问网络。[隐私声明](PRIVACY.md)
 
@@ -166,7 +168,7 @@ src/
 | `npm run dev` | Vite + Electron 开发模式 |
 | `npm run dev:debug` | 同上 + DevTools |
 | `npm run build` | 构建 |
-| `npm run package` | 打包 .dmg + .zip (arm64 & x64) |
+| `npm run package` | 打包 .dmg + .zip（Apple 芯片） |
 
 </details>
 
