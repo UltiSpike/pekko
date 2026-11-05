@@ -4,9 +4,9 @@
 
 <img src="assets/icons/pekko.iconset/icon_256x256.png" width="128" />
 
-**Keyboard sounds for the keyboard you already have.**
+**A soundscape for the hour you're in.**
 
-A macOS menu-bar app. Type anywhere, and Pekko plays the switch you picked.
+The sound of typing, as a switch or as a mood. It lives in the macOS menu bar.
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Apache_2.0-blue?style=flat-square" alt="License" /></a>
@@ -18,7 +18,7 @@ A macOS menu-bar app. Type anywhere, and Pekko plays the switch you picked.
 
 ---
 
-Pekko lives in the menu bar. Each keypress plays a real switch recording, placed left-to-right across the row, then voiced so a Cherry MX Black and a Holy Panda are not the same sample with a different name. Long sessions ease the volume down on their own. Five modes cover a heavy thock, a noise bed for focus or writing, the recording left alone, and an arcade sprint.
+Each keypress is a real switch recording, placed along the row. A Black and a Holy Panda keep their own body, spring, and tail. Stay with it and the volume eases back: the sound remains, just no longer pressing forward. Five moods: a heavy thock, a noise bed for focus or writing, the recording as it was, and an arcade sprint.
 
 **[Download for macOS](https://github.com/UltiSpike/pekko/releases)** · macOS 11 or later
 

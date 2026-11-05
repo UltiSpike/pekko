@@ -4,9 +4,9 @@
 
 # Pekko
 
-**给手头这块键盘，补上机械轴的声音。**
+**一席声景，契合你当下的状态。**
 
-macOS 菜单栏应用。在任何地方打字，Pekko 就播放你选的那颗轴。
+打字的声音，可以是一颗轴，也可以是一种心境。它待在 macOS 的菜单栏里。
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Apache_2.0-blue?style=flat-square" alt="License" /></a>
@@ -18,7 +18,7 @@ macOS 菜单栏应用。在任何地方打字，Pekko 就播放你选的那颗�
 
 ---
 
-Pekko 待在菜单栏里。每次按键播放一段真实轴体录音，按键位从左到右摆开，再套上这颗轴自己的音色，所以 Cherry MX Black 和 Holy Panda 不是同一段采样换个名字。长时间打字时音量会自己降下来。五种 Mode：厚实的 Thock、适合专注或写作的噪声铺底、不做处理的原声，以及街机冲刺。
+按键落下，是一段真实的轴体录音，从左到右贴着键位。Black 与 Holy Panda 各有自己的身体、弹簧与尾音。坐得久了，音量自己退半步，声音还在，只是不再往前挤。五种心境：厚实的 Thock、沉进噪声的专注与写作、轴体本来的样子，以及一阵街机冲刺。
 
 **[下载 macOS 版](https://github.com/UltiSpike/pekko/releases)** · macOS 11 及以上
 
