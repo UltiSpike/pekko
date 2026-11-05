@@ -15,9 +15,9 @@
   "mac": {
     "category": "public.app-category.utilities",
     "icon": "assets/icons/app-icon.icns",
-    // No Developer ID on this project yet. An explicit null skips signing
-    // instead of failing the package step when the keychain is empty.
-    "identity": null,
+    // No Developer ID yet. "-" is an ad-hoc signature, which arm64 requires
+    // in order to launch. Hardened runtime stays off until a real cert exists.
+    "identity": "-",
     "hardenedRuntime": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",

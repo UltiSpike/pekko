@@ -33,7 +33,7 @@
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
     "build": "npm run build:renderer && npm run build:main",
-    "package": "npm run build && electron-builder",
+    "package": "npm run build && electron-builder --publish never",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "gen:rush-icons": "node scripts/gen-rush-icons.js",
     "postinstall": "electron-builder install-app-deps"
